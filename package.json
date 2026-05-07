@@ -1,0 +1,28 @@
+{
+  "name": "wearshare",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@gradio/client": "^2.1.0",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.3.4",
+    "next": "14.2.3",
+    "nodemailer": "^8.0.1",
+    "razorpay": "^2.9.2",
+    "react": "^18",
+    "react-dom": "^18",
+    "replicate": "^1.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "typescript": "^5"
+  }
+}
