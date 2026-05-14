@@ -1,41 +1,54 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Booking from '@/models/Booking'
-import Listing from '@/models/Listing'
-import { getTokenFromRequest, verifyToken } from '@/lib/auth'
+import { supabaseAdmin } from '@/lib/supabase'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '../../auth/[...nextauth]/route'
 
 export async function PUT(request) {
-  const token = getTokenFromRequest(request)
-  const decoded = verifyToken(token)
-  if (!decoded) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const session = await getServerSession(authOptions)
+  if (!session || !session.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
-    await connectDB()
     const { bookingId, deliveryStatus, pickupLocation, pickupTime, returnLocation } = await request.json()
 
-    const booking = await Booking.findById(bookingId)
-    if (!booking) return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
+    const { data: booking, error: fetchError } = await supabaseAdmin
+      .from('bookings')
+      .select('id, lender_id, renter_id, listing_id')
+      .eq('id', bookingId)
+      .single()
+
+    if (fetchError || !booking) return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
 
     // Only lender or renter can update
-    if (booking.lenderId !== decoded.userId && booking.renterId !== decoded.userId) {
+    if (booking.lender_id !== session.user.id && booking.renter_id !== session.user.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const update = {}
-    if (deliveryStatus) update.deliveryStatus = deliveryStatus
-    if (pickupLocation) update.pickupLocation = pickupLocation
-    if (pickupTime) update.pickupTime = pickupTime
-    if (returnLocation) update.returnLocation = returnLocation
+    if (deliveryStatus) update.status = deliveryStatus // Assuming 'status' handles this
+    if (pickupLocation) update.pickup_location = pickupLocation
+    if (pickupTime) update.pickup_time = pickupTime
+    if (returnLocation) update.return_location = returnLocation
 
     // If returned, mark listing as available again
     if (deliveryStatus === 'returned') {
-      await Listing.findByIdAndUpdate(booking.listingId, { available: true })
+      await supabaseAdmin
+        .from('listings')
+        .update({ available: true })
+        .eq('id', booking.listing_id)
+      
       update.status = 'completed'
     }
 
-    await Booking.findByIdAndUpdate(bookingId, update)
+    const { error: updateError } = await supabaseAdmin
+      .from('bookings')
+      .update(update)
+      .eq('id', bookingId)
+
+    if (updateError) throw updateError
+
     return NextResponse.json({ success: true })
   } catch (err) {
+    console.error(err)
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }

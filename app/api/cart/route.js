@@ -1,72 +1,127 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Cart from '@/models/Cart'
-import Listing from '@/models/Listing'
-import { getTokenFromRequest, verifyToken } from '@/lib/auth'
+import { supabaseAdmin } from '@/lib/supabase'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '../auth/[...nextauth]/route'
 
 export async function GET(request) {
-  const token = getTokenFromRequest(request)
-  const decoded = verifyToken(token)
-  if (!decoded) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const session = await getServerSession(authOptions)
+  if (!session || !session.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  await connectDB()
-  const cart = await Cart.findOne({ userId: decoded.userId })
-  return NextResponse.json({ items: cart?.items || [] })
+  // Find or create cart
+  let { data: cart } = await supabaseAdmin
+    .from('carts')
+    .select('id')
+    .eq('user_id', session.user.id)
+    .single()
+
+  if (!cart) {
+    const { data: newCart } = await supabaseAdmin
+      .from('carts')
+      .insert({ user_id: session.user.id })
+      .select('id')
+      .single()
+    cart = newCart
+  }
+
+  if (!cart) return NextResponse.json({ items: [] })
+
+  const { data: cartItems } = await supabaseAdmin
+    .from('cart_items')
+    .select(`
+      days,
+      listing_id,
+      listings (
+        id,
+        title,
+        rental_price_per_day,
+        security_deposit,
+        size,
+        category,
+        owner_id
+      )
+    `)
+    .eq('cart_id', cart.id)
+
+  const formattedItems = (cartItems || []).map(item => ({
+    listingId: item.listing_id,
+    name: item.listings?.title,
+    rentalPricePerDay: item.listings?.rental_price_per_day,
+    securityDeposit: item.listings?.security_deposit,
+    size: item.listings?.size,
+    days: item.days,
+    ownerId: item.listings?.owner_id
+  }))
+
+  return NextResponse.json({ items: formattedItems })
 }
 
 export async function POST(request) {
-  const token = getTokenFromRequest(request)
-  const decoded = verifyToken(token)
-  if (!decoded) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const session = await getServerSession(authOptions)
+  if (!session || !session.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  await connectDB()
   const { listingId, days } = await request.json()
-  const listing = await Listing.findById(listingId)
-  if (!listing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  // Prevent users from renting/buying their own items
-  if (listing.ownerId && listing.ownerId.toString() === decoded.userId) {
+  const { data: listing, error: listingError } = await supabaseAdmin
+    .from('listings')
+    .select('id, owner_id')
+    .eq('id', listingId)
+    .single()
+
+  if (listingError || !listing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  if (listing.owner_id === session.user.id) {
     return NextResponse.json({ error: 'You cannot rent your own listing' }, { status: 400 })
   }
 
-  const item = {
-    listingId: listingId,
-    name: listing.name,
-    rentalPricePerDay: listing.rentalPricePerDay,
-    securityDeposit: listing.securityDeposit,
-    size: listing.size,
-    brand: listing.brand,
-    ownerId: listing.ownerId.toString(),
-    ownerName: listing.ownerName,
-    days: days || 1
+  // Find or create cart
+  let { data: cart } = await supabaseAdmin
+    .from('carts')
+    .select('id')
+    .eq('user_id', session.user.id)
+    .single()
+
+  if (!cart) {
+    const { data: newCart } = await supabaseAdmin
+      .from('carts')
+      .insert({ user_id: session.user.id })
+      .select('id')
+      .single()
+    cart = newCart
   }
 
-  let cart = await Cart.findOne({ userId: decoded.userId })
-  if (cart) {
-    const idx = cart.items.findIndex(i => i.listingId === listingId)
-    if (idx >= 0) {
-      cart.items[idx].days = days || 1
-    } else {
-      cart.items.push(item)
-    }
-    cart.updatedAt = new Date()
-    await cart.save()
-  } else {
-    cart = await Cart.create({ userId: decoded.userId, items: [item] })
-  }
+  // Upsert cart item
+  const { error: upsertError } = await supabaseAdmin
+    .from('cart_items')
+    .upsert(
+      { cart_id: cart.id, listing_id: listingId, days: days || 1 },
+      { onConflict: 'cart_id,listing_id' }
+    )
 
-  return NextResponse.json({ success: true, items: cart.items })
+  if (upsertError) return NextResponse.json({ error: upsertError.message }, { status: 500 })
+
+  return NextResponse.json({ success: true })
 }
 
 export async function DELETE(request) {
-  const token = getTokenFromRequest(request)
-  const decoded = verifyToken(token)
-  if (!decoded) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const session = await getServerSession(authOptions)
+  if (!session || !session.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  await connectDB()
   const { searchParams } = new URL(request.url)
   const listingId = searchParams.get('listingId')
 
-  await Cart.updateOne({ userId: decoded.userId }, { $pull: { items: { listingId } } })
+  const { data: cart } = await supabaseAdmin
+    .from('carts')
+    .select('id')
+    .eq('user_id', session.user.id)
+    .single()
+
+  if (cart && listingId) {
+    await supabaseAdmin
+      .from('cart_items')
+      .delete()
+      .eq('cart_id', cart.id)
+      .eq('listing_id', listingId)
+  }
+
   return NextResponse.json({ success: true })
 }

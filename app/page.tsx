@@ -1,32 +1,75 @@
-"use client";
-import { useEffect, useState } from "react";
 import Link from "next/link";
-
+import Image from "next/image";
 import { ArrowUpRight, Sparkles, ShieldCheck, MapPin, Calendar, Star } from "lucide-react";
 import heroImg from "@/assets/hero-lehenga.jpg";
 import communityImg from "@/assets/community.jpg";
 import { listings as dummyListings, inr } from "@/lib/listings";
 import { ListingCard } from "@/components/listing-card";
+import { supabaseAdmin } from "@/lib/supabase";
 
-export default function Index() {
-  const [featured, setFeatured] = useState<any[]>([]);
-  const [editorial, setEditorial] = useState<any[]>([]);
+// Cache this page and revalidate every 60 seconds
+export const revalidate = 60;
 
-  useEffect(() => {
-    fetch('/api/listings')
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data) && data.length > 0) {
-          setFeatured(data.slice(0, 4));
-          setEditorial(data.slice(2, 5));
-        } else {
-          // Fallback if DB is empty for some reason
-          setFeatured(dummyListings.slice(0, 4));
-          setEditorial(dummyListings.slice(2, 5));
-        }
-      })
-      .catch(console.error);
-  }, []);
+export default async function Index() {
+  let featured = [];
+  let editorial = [];
+
+  try {
+    const { data: listings, error } = await supabaseAdmin
+      .from('listings')
+      .select(`
+        *,
+        owner:users!owner_id (
+          id,
+          name,
+          is_verified,
+          rating
+        )
+      `)
+      .eq('available', true)
+      .order('created_at', { ascending: false })
+      .limit(10)
+    
+    if (error) throw error
+
+    // Map Supabase relational data to match the expected frontend structure
+    const plainData = (listings || []).map(l => ({
+      _id: l.id,
+      id: l.id,
+      name: l.title,
+      title: l.title,
+      description: l.description,
+      category: l.category,
+      size: l.size,
+      condition: l.condition,
+      rentalPricePerDay: l.rental_price_per_day,
+      pricePerDay: l.rental_price_per_day,
+      securityDeposit: l.security_deposit,
+      deposit: l.security_deposit,
+      imageUrl: l.image_url,
+      image: l.image_url,
+      available: l.available,
+      ownerId: l.owner ? {
+        _id: l.owner.id,
+        name: l.owner.name,
+        isVerified: l.owner.is_verified,
+        rating: l.owner.rating
+      } : null,
+      lister: l.owner?.name
+    }))
+
+    if (plainData && plainData.length > 0) {
+      featured = plainData.slice(0, 4);
+      editorial = plainData.slice(2, 5);
+    } else {
+      featured = dummyListings.slice(0, 4);
+      editorial = dummyListings.slice(2, 5);
+    }
+  } catch (error) {
+    console.error("Failed to fetch listings for landing page:", error);
+    featured = dummyListings.slice(0, 4);
+    editorial = dummyListings.slice(2, 5);
+  }
 
   return (
     <div className="bg-background">
@@ -44,17 +87,11 @@ export default function Index() {
               your pincode. No fast fashion. No storage. No regrets.
             </p>
             <div className="mt-9 flex flex-wrap items-center gap-3 animate-fade-up">
-              <Link
-                href="/browse"
-                className="btn-primary"
-              >
+              <Link href="/browse" className="btn-primary">
                 Browse outfits near you
                 <ArrowUpRight className="h-4 w-4" />
               </Link>
-              <Link
-                href="/list-item"
-                className="btn-outline"
-              >
+              <Link href="/list-item" className="btn-outline">
                 List your wardrobe
               </Link>
             </div>
@@ -73,13 +110,14 @@ export default function Index() {
           </div>
 
           <div className="md:col-span-5 order-1 md:order-2 relative">
-            <div className="relative aspect-[3/4] overflow-hidden">
-              <img
-                src={heroImg.src}
+            <div className="relative aspect-[3/4] overflow-hidden rounded-xl">
+              <Image
+                src={heroImg}
                 alt="Editorial portrait of an Indian woman in an emerald and gold lehenga"
-                width={1080}
-                height={1440}
-                className="h-full w-full object-cover"
+                priority
+                fill
+                sizes="(max-width: 768px) 100vw, 50vw"
+                className="object-cover"
               />
             </div>
             <div className="panel absolute -bottom-6 -left-4 max-w-[240px] p-5 md:-left-10">
@@ -125,7 +163,7 @@ export default function Index() {
             <h2 className="font-display text-4xl md:text-5xl text-ink mt-3">This week's picks</h2>
           </div>
           <Link href="/browse" className="hidden md:inline-flex items-center gap-1 text-sm text-ink border-b border-ink pb-1 hover:text-primary hover:border-primary transition-colors">
-            View all 124 outfits <ArrowUpRight className="h-4 w-4" />
+            View all outfits <ArrowUpRight className="h-4 w-4" />
           </Link>
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-5 gap-y-12">
@@ -174,15 +212,16 @@ export default function Index() {
       <section className="container-edit py-24 md:py-32">
         <div className="grid md:grid-cols-12 gap-12 md:gap-20 items-center">
           <div className="md:col-span-6 relative">
-            <img
-              src={communityImg.src}
-              alt="Friends sharing outfits in a sunlit room"
-              width={1400}
-              height={900}
-              loading="lazy"
-              className="w-full h-auto"
-            />
-            <div className="absolute -top-5 -right-5 bg-primary text-primary-foreground p-5 max-w-[200px] hidden md:block">
+            <div className="relative w-full aspect-[4/3] rounded-xl overflow-hidden">
+              <Image
+                src={communityImg}
+                alt="Friends sharing outfits in a sunlit room"
+                fill
+                sizes="(max-width: 768px) 100vw, 50vw"
+                className="object-cover"
+              />
+            </div>
+            <div className="absolute -top-5 -right-5 bg-primary text-primary-foreground p-5 max-w-[200px] hidden md:block rounded-xl shadow-lg">
               <Sparkles className="h-4 w-4 mb-2" />
               <p className="font-display text-sm leading-snug">73% of clothes in Indian wardrobes are worn fewer than 3 times.</p>
             </div>
@@ -271,8 +310,14 @@ export default function Index() {
           </div>
         </div>
         <div className="grid md:grid-cols-3 gap-8">
-          <Link href="/browse?category=men" className="group relative aspect-[4/5] overflow-hidden rounded-md block shadow-sm hover:shadow-md transition-shadow">
-            <img src="/men_collection.png" alt="Men's Collection" className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]" />
+          <Link href="/browse?category=men" className="group relative aspect-[4/5] overflow-hidden rounded-xl block shadow-sm hover:shadow-md transition-shadow">
+            <Image 
+              src="/men_collection.png" 
+              alt="Men's Collection" 
+              fill
+              sizes="(max-width: 768px) 100vw, 33vw"
+              className="object-cover transition-transform duration-700 group-hover:scale-[1.03]" 
+            />
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent opacity-80" />
             <div className="absolute inset-x-0 bottom-0 p-10 flex flex-col items-center justify-end h-full text-center">
               <h3 className="font-sans text-4xl md:text-5xl font-semibold text-white mb-6 tracking-normal">MEN</h3>
@@ -282,8 +327,14 @@ export default function Index() {
             </div>
           </Link>
           
-          <Link href="/browse?category=women" className="group relative aspect-[4/5] overflow-hidden rounded-md block shadow-sm hover:shadow-md transition-shadow">
-            <img src="/women_collection.png" alt="Women's Collection" className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]" />
+          <Link href="/browse?category=women" className="group relative aspect-[4/5] overflow-hidden rounded-xl block shadow-sm hover:shadow-md transition-shadow">
+            <Image 
+              src="/women_collection.png" 
+              alt="Women's Collection" 
+              fill
+              sizes="(max-width: 768px) 100vw, 33vw"
+              className="object-cover transition-transform duration-700 group-hover:scale-[1.03]" 
+            />
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent opacity-80" />
             <div className="absolute inset-x-0 bottom-0 p-10 flex flex-col items-center justify-end h-full text-center">
               <h3 className="font-sans text-4xl md:text-5xl font-semibold text-white mb-6 tracking-normal">WOMEN</h3>
@@ -293,8 +344,14 @@ export default function Index() {
             </div>
           </Link>
 
-          <Link href="/browse?category=accessories" className="group relative aspect-[4/5] overflow-hidden rounded-md block shadow-sm hover:shadow-md transition-shadow">
-            <img src="/accessories_collection.png" alt="Accessories Collection" className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]" />
+          <Link href="/browse?category=accessories" className="group relative aspect-[4/5] overflow-hidden rounded-xl block shadow-sm hover:shadow-md transition-shadow">
+            <Image 
+              src="/accessories_collection.png" 
+              alt="Accessories Collection" 
+              fill
+              sizes="(max-width: 768px) 100vw, 33vw"
+              className="object-cover transition-transform duration-700 group-hover:scale-[1.03]" 
+            />
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent opacity-80" />
             <div className="absolute inset-x-0 bottom-0 p-10 flex flex-col items-center justify-end h-full text-center">
               <h3 className="font-sans text-4xl md:text-5xl font-semibold text-white mb-6 tracking-normal">ACCESSORIES</h3>
@@ -308,7 +365,7 @@ export default function Index() {
 
       {/* FINAL CTA */}
       <section className="container-edit pb-24">
-        <div className="border border-ink p-10 md:p-16 text-center">
+        <div className="border border-ink p-10 md:p-16 text-center rounded-xl">
           <p className="eyebrow">Join the waitlist for new pincodes</p>
           <h2 className="font-display text-4xl md:text-6xl mt-4 text-ink leading-[1.05]">
             A wardrobe shared is<br />a wardrobe <span className="italic text-primary">multiplied.</span>
@@ -317,9 +374,9 @@ export default function Index() {
             <input
               type="email"
               placeholder="your@email.in"
-              className="flex-1 bg-transparent border border-ink px-4 py-3 text-sm focus:outline-none focus:border-primary"
+              className="flex-1 bg-transparent border border-ink px-4 py-3 text-sm focus:outline-none focus:border-primary rounded-lg"
             />
-            <button type="button" className="bg-ink text-cream px-6 py-3 text-sm font-medium hover:bg-primary transition-colors">
+            <button type="button" className="bg-ink text-cream px-6 py-3 text-sm font-medium hover:bg-primary transition-colors rounded-lg">
               Notify me
             </button>
           </form>

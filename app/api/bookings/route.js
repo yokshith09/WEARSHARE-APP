@@ -1,15 +1,55 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Booking from '@/models/Booking'
-import { getTokenFromRequest, verifyToken } from '@/lib/auth'
+import { supabaseAdmin } from '@/lib/supabase'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '../auth/[...nextauth]/route'
 
 export async function GET(request) {
-  const token = getTokenFromRequest(request)
-  const decoded = verifyToken(token)
-  if (!decoded) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const session = await getServerSession(authOptions)
+  if (!session || !session.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  await connectDB()
-  const rentals = await Booking.find({ renterId: decoded.userId }).sort({ createdAt: -1 })
-  const lending = await Booking.find({ lenderId: decoded.userId }).sort({ createdAt: -1 })
-  return NextResponse.json({ rentals, lending })
+  try {
+    const { data: rentals, error: rentalsError } = await supabaseAdmin
+      .from('bookings')
+      .select('*, listings(*)')
+      .eq('renter_id', session.user.id)
+      .order('created_at', { ascending: false })
+
+    if (rentalsError) throw rentalsError
+
+    const { data: lending, error: lendingError } = await supabaseAdmin
+      .from('bookings')
+      .select('*, listings(*)')
+      .eq('lender_id', session.user.id)
+      .order('created_at', { ascending: false })
+
+    if (lendingError) throw lendingError
+
+    // Map to expected frontend keys
+    const formatBooking = (b) => ({
+      _id: b.id,
+      id: b.id,
+      listingId: b.listing_id,
+      listingName: b.listings?.title || b.listingName,
+      listingImage: b.listings?.image_url || b.listingImage,
+      lenderId: b.lender_id,
+      renterId: b.renter_id,
+      days: b.days,
+      rentalStart: b.rental_start,
+      rentalEnd: b.rental_end,
+      rentalPrice: b.rental_price,
+      securityDeposit: b.security_deposit,
+      totalAmount: b.total_amount,
+      status: b.status,
+      deliveryStatus: b.status, // temporary map if delivery isn't explicit
+      createdAt: b.created_at,
+    })
+
+    return NextResponse.json({ 
+      rentals: rentals.map(formatBooking), 
+      lending: lending.map(formatBooking) 
+    })
+  } catch (err) {
+    console.error(err)
+    return NextResponse.json({ error: err.message }, { status: 500 })
+  }
 }

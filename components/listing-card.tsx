@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import Link from "next/link";
 import { BadgeCheck, MapPin, Star } from "lucide-react";
 import type { Listing } from "@/lib/listings";
@@ -6,7 +7,7 @@ import { inr } from "@/lib/listings";
 
 export function ListingCard({ listing, priority = false }: { listing: any; priority?: boolean }) {
   const isVerified = listing.ownerId?.isVerified || listing.verified;
-  const image = listing.imageUrl || listing.imageData || listing.image;
+  const image = listing.imageUrl || listing.imageData || listing.image || "/placeholder.jpg";
   const title = listing.name || listing.title;
   const price = listing.rentalPricePerDay || listing.pricePerDay;
   const rating = listing.ownerId?.rating || listing.rating || 4.5;
@@ -17,11 +18,13 @@ export function ListingCard({ listing, priority = false }: { listing: any; prior
   return (
     <Link href={`/listing/${listing._id || listing.id}`} className="group block">
       <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-muted shadow-sm transition-all duration-500 hover:shadow-2xl">
-        <img
+        <Image
           src={image}
           alt={title}
-          loading={priority ? "eager" : "lazy"}
-          className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+          fill
+          priority={priority}
+          sizes="(max-width: 768px) 50vw, (max-width: 1200px) 25vw, 20vw"
+          className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20 opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
         

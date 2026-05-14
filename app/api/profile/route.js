@@ -1,19 +1,28 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import User from '@/models/User'
-import { getTokenFromRequest, verifyToken } from '@/lib/auth'
+import { supabaseAdmin } from '@/lib/supabase'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '../auth/[...nextauth]/route'
 
 export async function PUT(request) {
-  const token = getTokenFromRequest(request)
-  const decoded = verifyToken(token)
-  if (!decoded) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const session = await getServerSession(authOptions)
+  if (!session || !session.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  await connectDB()
-  const data = await request.json()
-  await User.findByIdAndUpdate(decoded.userId, {
-    name: data.name,
-    phone: data.phone,
-    address: data.address
-  })
-  return NextResponse.json({ success: true })
+  try {
+    const data = await request.json()
+    const { error } = await supabaseAdmin
+      .from('users')
+      .update({
+        name: data.name,
+        phone: data.phone,
+        address: data.address
+      })
+      .eq('id', session.user.id)
+
+    if (error) throw error
+
+    return NextResponse.json({ success: true })
+  } catch (err) {
+    console.error(err)
+    return NextResponse.json({ error: err.message }, { status: 500 })
+  }
 }
