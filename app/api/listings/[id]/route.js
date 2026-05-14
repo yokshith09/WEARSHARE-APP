@@ -6,7 +6,7 @@ import { getTokenFromRequest, verifyToken } from '@/lib/auth'
 export async function GET(request, { params }) {
   try {
     await connectDB()
-    const listing = await Listing.findById(params.id)
+    const listing = await Listing.findById(params.id).populate('ownerId', 'isVerified name rating avatar')
     if (!listing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     return NextResponse.json(listing)
   } catch (err) {

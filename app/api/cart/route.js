@@ -24,6 +24,11 @@ export async function POST(request) {
   const listing = await Listing.findById(listingId)
   if (!listing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
+  // Prevent users from renting/buying their own items
+  if (listing.ownerId && listing.ownerId.toString() === decoded.userId) {
+    return NextResponse.json({ error: 'You cannot rent your own listing' }, { status: 400 })
+  }
+
   const item = {
     listingId: listingId,
     name: listing.name,

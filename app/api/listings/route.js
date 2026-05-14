@@ -9,10 +9,12 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url)
     const category = searchParams.get('category')
     const size = searchParams.get('size')
-    const search = searchParams.get('search')
+    const search = searchParams.get('search') || searchParams.get('q')
     const minPrice = searchParams.get('min_price')
     const maxPrice = searchParams.get('max_price')
-    const userOnly = searchParams.get('user')
+    const listingType = searchParams.get('listingType')
+    const gender = searchParams.get('gender')
+    const userOnly = searchParams.get('user') || searchParams.get('mine')
 
     const token = getTokenFromRequest(request)
     const decoded = token ? verifyToken(token) : null
@@ -21,6 +23,8 @@ export async function GET(request) {
     if (userOnly && decoded) query = { ownerId: decoded.userId }
     if (category) query.category = category
     if (size) query.size = size
+    if (listingType) query.listingType = listingType
+    if (gender) query.gender = gender
     if (search) query.$or = [
       { name: { $regex: search, $options: 'i' } },
       { brand: { $regex: search, $options: 'i' } },
@@ -32,7 +36,7 @@ export async function GET(request) {
       if (maxPrice) query.rentalPricePerDay.$lte = Number(maxPrice)
     }
 
-    const listings = await Listing.find(query).sort({ createdAt: -1 }).limit(50)
+    const listings = await Listing.find(query).sort({ createdAt: -1 }).limit(50).populate('ownerId', 'isVerified name rating')
     return NextResponse.json(listings)
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: 500 })
