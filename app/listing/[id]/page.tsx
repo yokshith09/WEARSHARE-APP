@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useMemo, useState, useEffect } from "react";
 import {
-  Star, MapPin, BadgeCheck, ShieldCheck, MessageCircle, Ruler, ArrowLeft, Calendar as CalendarIconLucide, Zap, ShoppingCart
+  Star, MapPin, BadgeCheck, ShieldCheck, MessageCircle, Ruler, ArrowLeft, Calendar as CalendarIconLucide, Zap, ShoppingCart, Sparkles
 } from "lucide-react";
 import { differenceInCalendarDays, format } from "date-fns";
 import type { DateRange } from "react-day-picker";
@@ -11,6 +11,7 @@ import { ListingCard } from "@/components/listing-card";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useParams, notFound, useRouter } from "next/navigation";
+import { trackEvent } from "@/lib/analytics";
 
 export default function ListingDetail() {
   const params = useParams();
@@ -23,7 +24,14 @@ export default function ListingDetail() {
     fetch(`/api/listings/${id}`)
       .then(res => res.json())
       .then(data => {
-        if (!data.error) setListing(data);
+        if (!data.error) {
+          setListing(data);
+          trackEvent("listing_viewed", {
+            listingId: data.id || data._id,
+            category: data.category,
+            pricePerDay: data.rentalPricePerDay || data.pricePerDay,
+          });
+        }
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -77,7 +85,7 @@ export default function ListingDetail() {
   
   const subtotal = days * price;
   const protectionFee = Math.round(subtotal * 0.05);
-  const total = subtotal + protectionFee;
+  const total = subtotal + protectionFee + deposit;
 
   const addToCart = async () => {
     if (!range?.from || !range?.to || days <= 0) return;
@@ -86,9 +94,15 @@ export default function ListingDetail() {
       const res = await fetch('/api/cart', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ listingId: listing._id || listing.id, days })
+        body: JSON.stringify({
+          listingId: listing._id || listing.id,
+          days,
+          rentalStart: range.from.toISOString().split("T")[0],
+          rentalEnd: range.to?.toISOString().split("T")[0],
+        })
       });
       if (res.ok) {
+         trackEvent("add_to_cart", { listingId: listing._id || listing.id, days, source: "rent_now" });
          router.push('/cart');
       } else {
          console.error('Failed to add to cart');
@@ -198,6 +212,7 @@ export default function ListingDetail() {
             <div className="mt-3 text-sm border border-border p-4 space-y-1.5 rounded-xl bg-secondary/20">
               <div className="flex justify-between"><span className="text-muted-foreground">{inr(price)} x {days} days</span><span className="text-ink">{inr(subtotal)}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Protection fee</span><span className="text-ink">{inr(protectionFee)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Refundable deposit</span><span className="text-ink">{inr(deposit)}</span></div>
               <div className="flex justify-between hairline pt-2 mt-2"><span className="text-ink font-medium">Total</span><span className="text-ink font-medium">{inr(total)}</span></div>
             </div>
           )}
@@ -205,18 +220,38 @@ export default function ListingDetail() {
           {days > 0 ? (
             <div className="mt-4 grid grid-cols-2 gap-3">
               <button
-                onClick={addToCart}
+                onClick={async () => {
+                  if (!range?.from || !range?.to || days <= 0) return;
+                  setAddingToCart(true);
+                  try {
+                    await fetch('/api/cart', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        listingId: listing._id || listing.id,
+                        days,
+                        rentalStart: range.from.toISOString().split("T")[0],
+                        rentalEnd: range.to?.toISOString().split("T")[0],
+                      })
+                    });
+                    trackEvent("add_to_cart", { listingId: listing._id || listing.id, days, source: "detail" });
+                    // Just add to cart, no redirect
+                    setAddingToCart(false);
+                  } catch (e) {
+                    setAddingToCart(false);
+                  }
+                }}
                 disabled={addingToCart}
                 className="w-full bg-secondary text-ink rounded-xl py-4 text-sm font-bold hover:bg-secondary/80 transition-all flex items-center justify-center gap-2 border border-border"
               >
                 <ShoppingCart className="h-4 w-4" /> {addingToCart ? "Adding..." : "Add to Cart"}
               </button>
-              <Link
-                href={`/booking/${listing._id || listing.id}?from=${range?.from ? format(range.from, "yyyy-MM-dd") : ""}&to=${range?.to ? format(range.to, "yyyy-MM-dd") : ""}&days=${days}`}
+              <button
+                onClick={addToCart}
                 className="w-full bg-primary text-white rounded-xl py-4 text-sm font-bold hover:bg-primary/90 hover:shadow-lg transition-all flex items-center justify-center gap-2"
               >
                 <Zap className="h-4 w-4" /> Rent Now
-              </Link>
+              </button>
             </div>
           ) : (
             <button disabled className="mt-4 w-full bg-ink text-cream rounded-xl py-4 text-sm font-medium opacity-40 cursor-not-allowed">
@@ -235,16 +270,27 @@ export default function ListingDetail() {
           </p>
 
           {/* Fit + Size */}
-          <div className="mt-8 grid grid-cols-2 gap-3 text-sm">
-            <div className="border border-border p-4 rounded-xl">
-              <p className="eyebrow flex items-center gap-1"><Ruler className="h-3 w-3" /> Size</p>
-              <p className="font-display text-2xl mt-1 text-ink">{size}</p>
-              <p className="mt-1 text-[11px] text-muted-foreground">Bust 36" / Waist 30" / Length 42"</p>
+          <div className="mt-8 space-y-3">
+            <div className="bg-primary/10 border border-primary/20 rounded-xl p-4 flex items-center gap-3">
+              <div className="bg-primary text-white p-2 rounded-full">
+                <Sparkles className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="font-medium text-primary text-sm">92% Match</p>
+                <p className="text-xs text-muted-foreground">This likely fits you based on your measurements.</p>
+              </div>
             </div>
-            <div className="border border-border p-4 rounded-xl">
-              <p className="eyebrow">Fit confidence</p>
-              <p className="font-display text-2xl mt-1 text-primary">{listing.fitScore || 90}<span className="text-sm text-muted-foreground">/100</span></p>
-              <p className="mt-1 text-[11px] text-muted-foreground">Based on past renter feedback</p>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="border border-border p-4 rounded-xl">
+                <p className="eyebrow flex items-center gap-1"><Ruler className="h-3 w-3" /> Size</p>
+                <p className="font-display text-2xl mt-1 text-ink">{size}</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">Bust 36" / Waist 30" / Length 42"</p>
+              </div>
+              <div className="border border-border p-4 rounded-xl">
+                <p className="eyebrow">Fit confidence</p>
+                <p className="font-display text-2xl mt-1 text-primary">{listing.fitScore || 90}<span className="text-sm text-muted-foreground">/100</span></p>
+                <p className="mt-1 text-[11px] text-muted-foreground">Based on past renter feedback</p>
+              </div>
             </div>
           </div>
 
@@ -346,7 +392,7 @@ export default function ListingDetail() {
 
       {/* Similar */}
       <section className="container-edit py-20">
-        <h2 className="font-display text-3xl md:text-4xl text-ink mb-10">More from your neighbourhood</h2>
+        <h2 className="font-display text-3xl md:text-4xl text-ink mb-10">Recommendations from Trusted Lenders</h2>
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-5 gap-y-12">
           {others.map((l) => <ListingCard key={l._id || l.id} listing={l} />)}
         </div>

@@ -1,0 +1,126 @@
+# WearShare Production Keys Guide
+
+This maps each `.env` key to exactly where you get the real value.
+
+## 1) Supabase
+
+Open Supabase Dashboard -> Project -> `Settings` -> `API`.
+
+- `NEXT_PUBLIC_SUPABASE_URL`: copy `Project URL`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`: copy `anon` / `publishable` key
+- `SUPABASE_SERVICE_ROLE_KEY`: copy `service_role` key
+
+Phone OTP:
+
+Open `Authentication` -> `Providers` -> `Phone` and enable provider.
+Configure SMS channel supported by Supabase in your project.
+
+## 2) NextAuth
+
+- `NEXTAUTH_URL`: deployed app URL, e.g. `https://wearshare.in`
+- `NEXTAUTH_SECRET`: generate 32+ random bytes
+
+PowerShell example:
+
+```powershell
+[Convert]::ToBase64String((1..48 | ForEach-Object { Get-Random -Maximum 256 }))
+```
+
+Google OAuth:
+
+Open [Google Cloud Console](https://console.cloud.google.com/) -> APIs & Services -> Credentials -> OAuth 2.0 Client.
+
+- `GOOGLE_ID`: OAuth client ID
+- `GOOGLE_SECRET`: OAuth client secret
+
+## 3) Razorpay
+
+Open [Razorpay Dashboard](https://dashboard.razorpay.com/) -> `Settings` -> `API Keys`.
+
+- `RAZORPAY_KEY_ID`
+- `RAZORPAY_KEY_SECRET`
+
+Webhook:
+
+Open `Settings` -> `Webhooks` -> create webhook for your `/api/payments/webhook` URL.
+
+- `RAZORPAY_WEBHOOK_SECRET`: webhook secret you set there
+
+## 4) Gemini
+
+Open [Google AI Studio](https://aistudio.google.com/app/apikey).
+
+- `GEMINI_API_KEY`: create API key
+
+## 5) PostHog
+
+Open PostHog -> Project Settings -> API Keys.
+
+- `NEXT_PUBLIC_POSTHOG_KEY`: project API key
+- `NEXT_PUBLIC_POSTHOG_HOST`: usually `https://app.posthog.com`
+
+## 6) Sentry
+
+Open Sentry -> Project Settings -> Client Keys (DSN):
+
+- `NEXT_PUBLIC_SENTRY_DSN`: DSN
+- `SENTRY_DSN`: same DSN is acceptable
+
+Open Sentry -> Settings -> Auth Tokens:
+
+- `SENTRY_AUTH_TOKEN`
+
+From Sentry org/project URLs:
+
+- `SENTRY_ORG`
+- `SENTRY_PROJECT`
+
+## 7) Resend
+
+Open [Resend Dashboard](https://resend.com/) -> API Keys:
+
+- `RESEND_API_KEY`
+
+Add and verify sender domain/address:
+
+- `RESEND_FROM_EMAIL`: e.g. `WearShare <bookings@wearshare.in>`
+
+## 8) Upstash Redis
+
+Open [Upstash Console](https://console.upstash.com/) -> Redis database -> REST API section.
+
+- `UPSTASH_REDIS_REST_URL`
+- `UPSTASH_REDIS_REST_TOKEN`
+
+## 9) Cloudflare R2
+
+Open Cloudflare Dashboard -> R2 -> bucket -> API Tokens / S3 API.
+
+- `R2_ACCOUNT_ID`: Cloudflare account ID
+- `R2_ACCESS_KEY_ID`
+- `R2_SECRET_ACCESS_KEY`
+- `R2_BUCKET`: bucket name, e.g. `wearshare-listing-photos`
+- `R2_PUBLIC_BASE_URL`: your public CDN URL or R2 public domain
+
+## 10) App Security Secrets
+
+- `INGEST_SECRET`: random secret for `/api/ingest`
+- `WEBHOOK_SECRET`: random secret for `/api/webhooks/listing`
+- `ALLOWED_ORIGINS`: comma-separated origins, e.g. `https://wearshare.in,https://www.wearshare.in,http://localhost:3000`
+
+## 11) Deploy Checklist
+
+1. Put all keys into local `.env.local`.
+2. Put same keys in Vercel (`Production` + `Preview`).
+3. Apply [supabase_schema.sql](E:/New folder/wearshare-app/supabase_schema.sql) in live Supabase SQL editor.
+4. Trigger ingest:
+
+```bash
+curl -X POST https://your-domain/api/ingest \
+  -H "Authorization: Bearer YOUR_INGEST_SECRET"
+```
+
+5. Test:
+- `/api/chat` returns grounded listing answers
+- `/api/chat/stream` streams tokens
+- chat widget shows listing cards for fashion queries

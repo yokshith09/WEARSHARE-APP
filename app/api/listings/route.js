@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '../auth/[...nextauth]/route'
+import { authOptions } from "@/lib/authOptions"
 
 export async function GET(request) {
   try {
@@ -13,6 +13,8 @@ export async function GET(request) {
     const maxPrice = searchParams.get('max_price')
     const listingType = searchParams.get('listingType')
     const gender = searchParams.get('gender')
+    const occasion = searchParams.get('occasion')
+    const pincode = searchParams.get('pincode')
     const userOnly = searchParams.get('user') || searchParams.get('mine')
 
     const session = await getServerSession(authOptions)
@@ -39,6 +41,8 @@ export async function GET(request) {
     if (size) query = query.eq('size', size)
     if (listingType) query = query.eq('listing_type', listingType) // Need to ensure schema has this if used
     if (gender) query = query.eq('gender', gender) // Need to ensure schema has this if used
+    if (occasion) query = query.ilike('occasion', `%${occasion}%`)
+    if (pincode) query = query.eq('pincode', pincode)
     if (minPrice) query = query.gte('rental_price_per_day', Number(minPrice))
     if (maxPrice) query = query.lte('rental_price_per_day', Number(maxPrice))
     if (search) {
@@ -57,6 +61,9 @@ export async function GET(request) {
       title: l.title,
       description: l.description,
       category: l.category,
+      occasion: l.occasion,
+      gender: l.gender,
+      listingType: l.listing_type,
       size: l.size,
       condition: l.condition,
       rentalPricePerDay: l.rental_price_per_day,
@@ -64,7 +71,11 @@ export async function GET(request) {
       securityDeposit: l.security_deposit,
       deposit: l.security_deposit,
       imageUrl: l.image_url,
+      photoUrls: l.photo_urls || (l.image_url ? [l.image_url] : []),
       image: l.image_url,
+      pincode: l.pincode,
+      area: l.area,
+      retailPrice: l.retail_price,
       available: l.available,
       ownerId: l.owner ? {
         _id: l.owner.id,
@@ -91,7 +102,17 @@ export async function POST(request) {
 
     const data = await request.json()
 
-    // Validate image size (rough check for base64)
+    const photoUrls = Array.isArray(data.photoUrls) ? data.photoUrls.filter(Boolean).slice(0, 6) : []
+    const imageUrl = data.imageUrl || photoUrls[0] || data.imageData || data.image
+
+    if (!data.name && !data.title) {
+      return NextResponse.json({ error: 'Title is required' }, { status: 400 })
+    }
+
+    if (!imageUrl) {
+      return NextResponse.json({ error: 'At least one listing photo is required' }, { status: 400 })
+    }
+
     if (data.imageData && data.imageData.length > 3 * 1024 * 1024) {
       return NextResponse.json({ error: 'Image too large. Please use an image under 2MB.' }, { status: 400 })
     }
@@ -103,11 +124,19 @@ export async function POST(request) {
         title: data.name || data.title,
         description: data.description,
         category: data.category,
+        occasion: data.occasion,
+        gender: data.gender,
+        listing_type: data.listingType,
         size: data.size,
-        condition: data.condition,
+        condition: data.condition || 'Good',
         rental_price_per_day: data.rentalPricePerDay || data.pricePerDay || 0,
         security_deposit: data.securityDeposit || data.deposit || 0,
-        image_url: data.imageUrl || data.imageData || data.image,
+        image_url: imageUrl,
+        photo_urls: photoUrls.length ? photoUrls : [imageUrl],
+        pincode: data.pincode,
+        area: data.area,
+        retail_price: data.retailPrice || null,
+        availability_calendar: data.availabilityCalendar || null,
       })
       .select()
       .single()

@@ -7,13 +7,26 @@ import {
 } from "lucide-react";
 import communityImg from "@/assets/community.jpg";
 import { Calendar } from "@/components/ui/calendar";
+import { trackEvent } from "@/lib/analytics";
 
 
 
-const CATEGORIES = ["Lehenga", "Saree", "Sherwani", "Anarkali", "Gown", "Kurta", "Suit"];
+const CATEGORIES = ["Lehenga", "Saree", "Sherwani", "Anarkali", "Gown", "Kurta", "Suit", "Indo-Western", "Blazer", "Tuxedo", "Co-ord Set", "Dhoti", "Accessories", "Shirt", "Pant"];
 const SIZES = ["XS", "S", "M", "L", "XL", "Free"];
 
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+
 export default function ListItem() {
+  const { status } = useSession();
+  const router = useRouter();
+
+  if (status === "loading") return <div className="py-32 text-center text-muted-foreground">Loading...</div>;
+  if (status === "unauthenticated") {
+    router.push("/login?callbackUrl=/list-item");
+    return null;
+  }
+
   return (
     <div className="bg-background">
       <section className="container-edit pt-14 md:pt-20 pb-16 grid md:grid-cols-12 gap-12 items-center">
@@ -101,15 +114,47 @@ export default function ListItem() {
 
 function ListingForm() {
   const [photos, setPhotos] = useState<string[]>([]);
+  const [photoFiles, setPhotoFiles] = useState<File[]>([]);
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [category, setCategory] = useState("Lehenga");
+  const [occasion, setOccasion] = useState("Wedding");
   const [size, setSize] = useState("M");
   const [retail, setRetail] = useState<number | "">("");
   const [pricePerDay, setPricePerDay] = useState<number | "">("");
   const [deposit, setDeposit] = useState<number | "">("");
+  const [pincode, setPincode] = useState("");
   const [unavailable, setUnavailable] = useState<Date[] | undefined>([]);
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [loadingAi, setLoadingAi] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleAiAutofill = async () => {
+    setLoadingAi(true);
+    try {
+      const res = await fetch("/api/ai/listing-assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageUrls: photos }),
+      });
+      const data = await res.json();
+      if (!data.error) {
+        setTitle(data.title || "");
+        setDescription(data.description || "");
+        setCategory(data.category || "Lehenga");
+        setOccasion(data.occasion || "Wedding");
+        setRetail(data.retailPrice || "");
+        setPricePerDay(data.pricePerDay || "");
+        setDeposit(data.deposit || "");
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingAi(false);
+    }
+  };
 
   const suggestedPrice = useMemo(() => {
     const r = typeof retail === "number" ? retail : 0;
@@ -123,40 +168,105 @@ function ListingForm() {
   const onFiles = (files: FileList | null) => {
     if (!files) return;
     const next: string[] = [];
+    const nextFiles: File[] = [];
     Array.from(files).slice(0, 6 - photos.length).forEach((f) => {
-      if (f.type.startsWith("image/")) next.push(URL.createObjectURL(f));
+      if (f.type.startsWith("image/")) {
+        next.push(URL.createObjectURL(f));
+        nextFiles.push(f);
+      }
     });
     setPhotos((p) => [...p, ...next].slice(0, 6));
+    setPhotoFiles((p) => [...p, ...nextFiles].slice(0, 6));
   };
 
-  const removePhoto = (i: number) =>
+  const removePhoto = (i: number) => {
     setPhotos((p) => p.filter((_, idx) => idx !== i));
+    setPhotoFiles((p) => p.filter((_, idx) => idx !== i));
+  };
+
+  const fileToDataUrl = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  const uploadPhotos = async () => {
+    if (photoFiles.length === 0) return photos;
+
+    const presign = await fetch("/api/uploads/presign", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        files: photoFiles.map((file) => ({ name: file.name, contentType: file.type })),
+      }),
+    });
+
+    if (presign.ok) {
+      const data = await presign.json();
+      await Promise.all(
+        data.uploads.map((upload: any, index: number) =>
+          fetch(upload.uploadUrl, {
+            method: "PUT",
+            headers: { "Content-Type": photoFiles[index].type },
+            body: photoFiles[index],
+          })
+        )
+      );
+      return data.uploads.map((upload: any) => upload.publicUrl);
+    }
+
+    return Promise.all(photoFiles.slice(0, 3).map(fileToDataUrl));
+  };
+
+  const publishListing = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!canSubmit || submitting) return;
+
+    setSubmitting(true);
+    setError("");
+
+    try {
+      const photoUrls = await uploadPhotos();
+      const response = await fetch("/api/listings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          description,
+          category,
+          occasion,
+          size,
+          condition: "Good",
+          retailPrice: retail || null,
+          pricePerDay,
+          deposit,
+          pincode,
+          photoUrls,
+          imageUrl: photoUrls[0],
+          availabilityCalendar: {
+            blockedDates: (unavailable || []).map((date) => date.toISOString().split("T")[0]),
+          },
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to publish listing");
+
+      trackEvent("listing_created", { listingId: data.id, category, size, pricePerDay });
+      setSubmitted(true);
+    } catch (err: any) {
+      setError(err.message || "Unable to publish listing");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const canSubmit = photos.length >= 3 && title && pricePerDay && deposit;
 
-  if (submitted) {
-    return (
-      <section id="new-listing" className="bg-secondary/40 py-24">
-        <div className="container-edit max-w-xl text-center">
-          <div className="h-14 w-14 rounded-full bg-primary text-cream mx-auto flex items-center justify-center">
-            <Check className="h-6 w-6" />
-          </div>
-          <h2 className="font-display text-4xl mt-6 text-ink">Listing submitted.</h2>
-          <p className="mt-3 text-muted-foreground">
-            Our team reviews new listings within 4 hours. You'll get a WhatsApp ping the moment it goes live.
-          </p>
-          <button
-            onClick={() => { setSubmitted(false); setPhotos([]); setTitle(""); setRetail(""); setPricePerDay(""); setDeposit(""); setUnavailable([]); }}
-            className="mt-8 inline-flex items-center gap-2 border border-ink text-ink px-5 py-2.5 text-sm hover:bg-ink hover:text-cream transition"
-          >
-            List another piece
-          </button>
-        </div>
-      </section>
-    );
-  }
-
   return (
+    <>
     <section id="new-listing" className="bg-secondary/40 py-20 md:py-24 border-y border-border">
       <div className="container-edit">
         <div className="grid md:grid-cols-12 gap-10">
@@ -172,12 +282,32 @@ function ListingForm() {
           </div>
 
           <form
-            onSubmit={(e) => { e.preventDefault(); setSubmitted(true); }}
+            onSubmit={publishListing}
             className="md:col-span-8 bg-background border border-border p-6 md:p-10 space-y-10"
           >
             {/* Photos */}
             <div>
-              <Label num="01" title="Photos" hint={`${photos.length}/6 / minimum 3 in daylight`} />
+              <div className="flex items-center justify-between">
+                <Label num="01" title="Photos" hint={`${photos.length}/6 / minimum 3 in daylight`} />
+                {photos.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleAiAutofill}
+                    disabled={loadingAi}
+                    className="flex items-center gap-2 bg-primary/10 text-primary hover:bg-primary/20 px-3 py-1.5 rounded-full text-xs font-medium transition-colors"
+                  >
+                    {loadingAi ? (
+                      <span className="flex items-center gap-2">
+                        <Sparkles className="h-3.5 w-3.5 animate-pulse" /> Analyzing...
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        <Sparkles className="h-3.5 w-3.5" /> Auto-fill with AI
+                      </span>
+                    )}
+                  </button>
+                )}
+              </div>
               <div className="mt-4 grid grid-cols-3 gap-3">
                 {photos.map((src, i) => (
                   <div key={i} className="relative aspect-square overflow-hidden bg-muted group">
@@ -234,6 +364,20 @@ function ListingForm() {
                     {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
                   </select>
                 </Field>
+                <Field label="Occasion">
+                  <select value={occasion} onChange={(e) => setOccasion(e.target.value)} className="form-input">
+                    {["Wedding", "Reception", "Sangeet", "Cocktail", "Festival", "Formal", "Casual"].map((c) => <option key={c}>{c}</option>)}
+                  </select>
+                </Field>
+                <Field label="Pincode">
+                  <input
+                    value={pincode}
+                    onChange={(e) => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="e.g. 560038"
+                    className="form-input"
+                    required
+                  />
+                </Field>
                 <Field label="Size">
                   <div className="flex gap-1.5 flex-wrap">
                     {SIZES.map((s) => (
@@ -247,6 +391,14 @@ function ListingForm() {
                       </button>
                     ))}
                   </div>
+                </Field>
+                <Field label="Description">
+                  <textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value.slice(0, 500))}
+                    placeholder="Fabric, fit, includes, and care notes"
+                    className="form-input min-h-24"
+                  />
                 </Field>
                 <Field label="Retail price (₹)">
                   <input
@@ -269,8 +421,8 @@ function ListingForm() {
                 <div className="mt-3 flex items-start gap-2 text-xs text-primary bg-primary/5 border border-primary/20 px-3 py-2">
                   <Sparkles className="h-3.5 w-3.5 mt-0.5 shrink-0" />
                   <span>
-                    Based on similar pieces, we suggest <strong>?{suggestedPrice}/day</strong> with a{" "}
-                    <strong>?{suggestedDeposit}</strong> refundable deposit.{" "}
+                    Based on similar pieces, we suggest <strong>₹{suggestedPrice}/day</strong> with a{" "}
+                    <strong>₹{suggestedDeposit}</strong> refundable deposit.{" "}
                     <button
                       type="button"
                       onClick={() => { setPricePerDay(suggestedPrice); setDeposit(suggestedDeposit); }}
@@ -345,22 +497,65 @@ function ListingForm() {
 
             {/* Submit */}
             <div className="hairline pt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <p className="text-xs text-muted-foreground">
-                By listing, you agree to WearShare's{" "}
-                <Link href="/how-it-works" className="underline">trust & safety policy</Link>.
-              </p>
+              <div>
+                <p className="text-xs text-muted-foreground">
+                  By listing, you agree to WearShare's{" "}
+                  <Link href="/how-it-works" className="underline">trust & safety policy</Link>.
+                </p>
+                {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+              </div>
               <button
                 type="submit"
-                disabled={!canSubmit}
+                disabled={!canSubmit || submitting}
                 className="inline-flex items-center justify-center gap-2 bg-ink text-cream px-7 py-3.5 text-sm font-medium hover:bg-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                Publish listing <ArrowUpRight className="h-4 w-4" />
+                {submitting ? "Publishing..." : "Publish listing"} <ArrowUpRight className="h-4 w-4" />
               </button>
             </div>
           </form>
         </div>
       </div>
     </section>
+
+    {submitted && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <div className="bg-background p-8 md:p-10 max-w-md w-full rounded-2xl shadow-2xl text-center relative animate-in fade-in zoom-in duration-300">
+          <div className="h-16 w-16 rounded-full bg-green-500 text-white mx-auto flex items-center justify-center mb-6 shadow-lg shadow-green-500/30">
+            <Check className="h-8 w-8" />
+          </div>
+          <h2 className="font-display text-4xl text-ink">Listing Successful!</h2>
+          <p className="mt-3 text-muted-foreground text-sm">
+            Your piece has been successfully listed. Our team reviews new listings within 4 hours. You'll get a WhatsApp ping the moment it goes live.
+          </p>
+          <div className="mt-8 flex flex-col gap-3">
+            <Link
+              href="/dashboard/lister"
+              className="w-full inline-flex items-center justify-center bg-primary text-white hover:bg-primary/90 rounded-xl py-3.5 text-sm font-medium transition"
+            >
+              View Dashboard
+            </Link>
+            <button
+              onClick={() => {
+                setSubmitted(false);
+                setPhotos([]);
+                setPhotoFiles([]);
+                setTitle("");
+                setDescription("");
+                setRetail("");
+                setPricePerDay("");
+                setDeposit("");
+                setUnavailable([]);
+                setError("");
+              }}
+              className="w-full bg-secondary text-ink hover:bg-secondary/80 rounded-xl py-3.5 text-sm font-medium transition"
+            >
+              List another piece
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 

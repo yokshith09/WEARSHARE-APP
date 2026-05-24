@@ -6,6 +6,7 @@ import communityImg from "@/assets/community.jpg";
 import { listings as dummyListings, inr } from "@/lib/listings";
 import { ListingCard } from "@/components/listing-card";
 import { supabaseAdmin } from "@/lib/supabase";
+import { WaitlistForm } from "@/components/waitlist-form";
 
 // Cache this page and revalidate every 60 seconds
 export const revalidate = 60;
@@ -86,15 +87,25 @@ export default async function Index() {
               Premium outfits for weddings, parties and college nights - rented from verified listers within
               your pincode. No fast fashion. No storage. No regrets.
             </p>
-            <div className="mt-9 flex flex-wrap items-center gap-3 animate-fade-up">
-              <Link href="/browse" className="btn-primary">
+            <form action="/browse" className="mt-9 flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-3 animate-fade-up">
+              <div className="flex items-center bg-background border border-border rounded-lg px-4 py-1 w-full sm:w-auto">
+                <MapPin className="h-4 w-4 text-muted-foreground mr-2 shrink-0" />
+                <input
+                  type="text"
+                  name="pincode"
+                  placeholder="Enter Pincode (e.g. 560038)"
+                  className="bg-transparent border-none outline-none text-sm w-full sm:w-48 py-2.5 text-ink"
+                  maxLength={6}
+                />
+              </div>
+              <button type="submit" className="btn-primary w-full sm:w-auto">
                 Browse outfits near you
-                <ArrowUpRight className="h-4 w-4" />
-              </Link>
-              <Link href="/list-item" className="btn-outline">
+                <ArrowUpRight className="h-4 w-4 shrink-0" />
+              </button>
+              <Link href="/list-item" className="btn-outline w-full sm:w-auto text-center">
                 List your wardrobe
               </Link>
-            </div>
+            </form>
             <dl className="mt-12 grid grid-cols-3 gap-6 max-w-lg">
               {[
                 ["10-20%", "of retail price"],
@@ -370,16 +381,7 @@ export default async function Index() {
           <h2 className="font-display text-4xl md:text-6xl mt-4 text-ink leading-[1.05]">
             A wardrobe shared is<br />a wardrobe <span className="italic text-primary">multiplied.</span>
           </h2>
-          <form className="mt-10 flex flex-col sm:flex-row gap-3 max-w-lg mx-auto">
-            <input
-              type="email"
-              placeholder="your@email.in"
-              className="flex-1 bg-transparent border border-ink px-4 py-3 text-sm focus:outline-none focus:border-primary rounded-lg"
-            />
-            <button type="button" className="bg-ink text-cream px-6 py-3 text-sm font-medium hover:bg-primary transition-colors rounded-lg">
-              Notify me
-            </button>
-          </form>
+          <WaitlistForm />
         </div>
       </section>
     </div>

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '../auth/[...nextauth]/route'
+import { authOptions } from "@/lib/authOptions"
 
 export async function GET(request) {
   const session = await getServerSession(authOptions)
@@ -29,6 +29,8 @@ export async function GET(request) {
     .from('cart_items')
     .select(`
       days,
+      rental_start,
+      rental_end,
       listing_id,
       listings (
         id,
@@ -48,7 +50,10 @@ export async function GET(request) {
     rentalPricePerDay: item.listings?.rental_price_per_day,
     securityDeposit: item.listings?.security_deposit,
     size: item.listings?.size,
+    category: item.listings?.category,
     days: item.days,
+    rentalStart: item.rental_start,
+    rentalEnd: item.rental_end,
     ownerId: item.listings?.owner_id
   }))
 
@@ -59,7 +64,7 @@ export async function POST(request) {
   const session = await getServerSession(authOptions)
   if (!session || !session.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { listingId, days } = await request.json()
+  const { listingId, days, rentalStart, rentalEnd } = await request.json()
 
   const { data: listing, error: listingError } = await supabaseAdmin
     .from('listings')
@@ -93,7 +98,13 @@ export async function POST(request) {
   const { error: upsertError } = await supabaseAdmin
     .from('cart_items')
     .upsert(
-      { cart_id: cart.id, listing_id: listingId, days: days || 1 },
+      {
+        cart_id: cart.id,
+        listing_id: listingId,
+        days: days || 1,
+        rental_start: rentalStart || null,
+        rental_end: rentalEnd || null,
+      },
       { onConflict: 'cart_id,listing_id' }
     )
 

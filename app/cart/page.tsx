@@ -25,7 +25,7 @@ export default function CartPage() {
   const subtotal = items.reduce((acc, item) => acc + (item.rentalPricePerDay * item.days), 0);
   const protectionFee = Math.round(subtotal * 0.05);
   const deposit = items.reduce((acc, item) => acc + (item.securityDeposit || 0), 0);
-  const total = subtotal + protectionFee;
+  const total = subtotal + protectionFee + deposit;
 
   if (loading) {
     return <div className="container-edit py-32 text-center text-muted-foreground">Loading cart...</div>;
@@ -54,7 +54,12 @@ export default function CartPage() {
                     <Link href={`/listing/${item.listingId}`} className="font-display text-xl text-ink hover:text-primary transition-colors block mt-1">
                       {item.name}
                     </Link>
-                    <p className="text-sm text-muted-foreground mt-2">Size: {item.size} • By {item.ownerName}</p>
+                    <p className="text-sm text-muted-foreground mt-2">Size: {item.size} • By {item.ownerName || "WearShare lister"}</p>
+                    {item.rentalStart && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {item.rentalStart} to {item.rentalEnd || "return date pending"}
+                      </p>
+                    )}
                     <div className="mt-4 flex items-center gap-4 text-sm">
                       <p className="font-semibold text-ink">₹{item.rentalPricePerDay?.toLocaleString("en-IN")}/day</p>
                       <p className="text-muted-foreground">{item.days} days</p>

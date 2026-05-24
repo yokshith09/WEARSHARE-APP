@@ -48,19 +48,19 @@ export function SiteHeader() {
             <span>Search</span>
           </Link>
           
-          <Link href="/browse"
+          <Link href="/list-item"
             className="btn-secondary hidden min-h-10 px-4 py-2 text-[13px] font-bold md:inline-flex"
           >
-            <Gem className="h-4 w-4" /> Rent now
+            <Gem className="h-4 w-4" /> List an Outfit
           </Link>
           
           <Link href="/dashboard" aria-label="Dashboard" className="hidden h-10 w-10 items-center justify-center rounded-md bg-secondary/60 hover:bg-secondary md:flex">
             <LayoutDashboard className="h-4 w-4 text-ink" />
           </Link>
 
-          <button aria-label="Account" className="hidden h-10 w-10 items-center justify-center rounded-md bg-secondary/60 hover:bg-secondary sm:flex">
+          <Link href="/login" aria-label="Account" className="hidden h-10 w-10 items-center justify-center rounded-md bg-secondary/60 hover:bg-secondary sm:flex">
             <User className="h-4 w-4 text-ink" />
-          </button>
+          </Link>
 
           <Link href="/cart" aria-label="Cart" className="hidden h-10 w-10 relative items-center justify-center rounded-md bg-secondary/60 hover:bg-secondary sm:flex">
             <ShoppingCart className="h-4 w-4 text-ink" />

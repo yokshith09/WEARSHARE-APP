@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '../auth/[...nextauth]/route'
+import { authOptions } from "@/lib/authOptions"
 
 export async function GET(request) {
   const session = await getServerSession(authOptions)
@@ -39,6 +39,9 @@ export async function GET(request) {
       rentalPrice: b.rental_price,
       securityDeposit: b.security_deposit,
       totalAmount: b.total_amount,
+      listerEarnings: b.lister_earnings,
+      paymentStatus: b.payment_status,
+      fulfillmentStatus: b.fulfillment_status,
       status: b.status,
       deliveryStatus: b.status, // temporary map if delivery isn't explicit
       createdAt: b.created_at,

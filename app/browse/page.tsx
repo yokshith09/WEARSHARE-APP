@@ -2,7 +2,7 @@
 
 import { Suspense } from "react";
 import { useEffect, useState, useMemo } from "react";
-import { SlidersHorizontal, MapPin, CalendarIcon, X } from "lucide-react";
+import { SlidersHorizontal, MapPin, CalendarIcon, X, Mic, Search } from "lucide-react";
 import { format } from "date-fns";
 import { isDateBlocked } from "@/lib/listings";
 import { ListingCard } from "@/components/listing-card";
@@ -10,8 +10,9 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { useSearchParams } from "next/navigation";
+import { trackEvent } from "@/lib/analytics";
 
-const categories = ["All", "Lehenga", "Saree", "Sherwani", "Anarkali", "Gown", "Kurta"];
+const categories = ["All", "Lehenga", "Saree", "Sherwani", "Anarkali", "Gown", "Kurta", "Suit", "Indo-Western", "Blazer", "Tuxedo", "Co-ord Set", "Dhoti", "Accessories", "Shirt", "Pant"];
 const occasions = ["All", "Wedding", "Reception", "Sangeet", "Cocktail", "Festival"];
 const sizes = ["All", "XS", "S", "M", "L", "XL", "Free"];
 const distances = [
@@ -44,6 +45,8 @@ function BrowseContent() {
   const [maxKm, setMaxKm] = useState(999);
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [sort, setSort] = useState("Recommended");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [listening, setListening] = useState(false);
   const [trustedOnly, setTrustedOnly] = useState(false);
   const [apiListings, setApiListings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,11 +69,13 @@ function BrowseContent() {
           const listingCat = l.category || 'All';
           const listingOcc = l.occasion || 'All';
           const distanceKm = l.distanceKm || 0;
+          const text = `${l.title || l.name || ""} ${l.description || ""} ${listingCat} ${listingOcc}`.toLowerCase();
           return (cat === "All" || listingCat.toLowerCase() === cat.toLowerCase()) &&
                  (occ === "All" || listingOcc.toLowerCase() === occ.toLowerCase()) &&
                  (size === "All" || l.size === size) &&
                  distanceKm <= maxKm &&
                  (!trustedOnly || isVerified) &&
+                 (!searchTerm || text.includes(searchTerm.toLowerCase())) &&
                  (!date || !isDateBlocked(l, date));
         }
       ).sort((a, b) => {
@@ -88,10 +93,20 @@ function BrowseContent() {
         if (sort === "Top rated") return bRating - aRating;
         return Number(bVerified) - Number(aVerified) || bRating - aRating;
       }),
-    [apiListings, cat, occ, size, maxKm, date, sort, trustedOnly],
+    [apiListings, cat, occ, size, maxKm, date, sort, trustedOnly, searchTerm],
   );
 
+  useEffect(() => {
+    if (loading) return;
+    const filters = { cat, occ, size, maxKm, trustedOnly, date: date?.toISOString(), searchTerm };
+    trackEvent("filter_changed", filters);
+    if (apiListings.length > 0 && filtered.length === 0) {
+      trackEvent("zero_results", filters);
+    }
+  }, [cat, occ, size, maxKm, trustedOnly, date, searchTerm, filtered.length, apiListings.length, loading]);
+
   const activeCount = [
+    searchTerm,
     cat !== "All",
     occ !== "All",
     size !== "All",
@@ -101,7 +116,29 @@ function BrowseContent() {
   ].filter(Boolean).length;
 
   const clearAll = () => {
-    setCat("All"); setOcc("All"); setSize("All"); setMaxKm(999); setDate(undefined); setSort("Recommended"); setTrustedOnly(false);
+    setSearchTerm(""); setCat("All"); setOcc("All"); setSize("All"); setMaxKm(999); setDate(undefined); setSort("Recommended"); setTrustedOnly(false);
+  };
+
+  const startVoiceSearch = () => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Voice search works best on Android Chrome.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-IN";
+    recognition.interimResults = false;
+    recognition.onstart = () => setListening(true);
+    recognition.onend = () => setListening(false);
+    recognition.onerror = () => setListening(false);
+    recognition.onresult = (event: any) => {
+      const transcript = event.results?.[0]?.[0]?.transcript || "";
+      setSearchTerm(transcript);
+      trackEvent("filter_changed", { source: "voice_search", transcript });
+    };
+    recognition.start();
   };
 
   return (
@@ -119,6 +156,23 @@ function BrowseContent() {
           <div className="flex items-center gap-1 shrink-0 text-xs text-muted-foreground pr-3 border-r border-border">
             <SlidersHorizontal className="h-3.5 w-3.5" />
             <span>Filters{activeCount > 0 && ` (${activeCount})`}</span>
+          </div>
+          <div className="shrink-0 flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5">
+            <Search className="h-3.5 w-3.5 text-muted-foreground" />
+            <input
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Search outfits"
+              className="w-36 bg-transparent text-xs outline-none"
+            />
+            <button
+              type="button"
+              aria-label="Voice search"
+              onClick={startVoiceSearch}
+              className={`rounded p-1 ${listening ? "bg-primary text-white" : "text-muted-foreground hover:text-ink"}`}
+            >
+              <Mic className="h-3.5 w-3.5" />
+            </button>
           </div>
           <FilterRow label="Occasion" value={occ} setValue={setOcc} options={occasions} />
           <FilterRow label="Category" value={cat} setValue={setCat} options={categories} />

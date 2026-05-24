@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '../../auth/[...nextauth]/route'
+import { authOptions } from "@/lib/authOptions"
+import { sendBookingConfirmationEmail } from '@/lib/notifications'
 
 export async function POST(request) {
   const session = await getServerSession(authOptions)
@@ -56,6 +57,8 @@ export async function POST(request) {
         .select(`
           listing_id,
           days,
+          rental_start,
+          rental_end,
           listings (*)
         `)
         .eq('cart_id', cart.id)
@@ -68,7 +71,7 @@ export async function POST(request) {
 
     const { data: renter } = await supabaseAdmin
       .from('users')
-      .select('name, phone')
+      .select('name, phone, email')
       .eq('id', session.user.id)
       .single()
 
@@ -78,8 +81,9 @@ export async function POST(request) {
     for (const item of itemsToProcess) {
       if (!item.listings) continue
 
-      const endDate = new Date(startDate)
-      endDate.setDate(endDate.getDate() + item.days)
+      const itemStartDate = item.rental_start ? new Date(item.rental_start) : startDate
+      const endDate = item.rental_end ? new Date(item.rental_end) : new Date(itemStartDate)
+      if (!item.rental_end) endDate.setDate(endDate.getDate() + item.days - 1)
 
       const subtotal = item.listings.rental_price_per_day * item.days
       const platformFee = Math.round((subtotal + item.listings.security_deposit) * 0.05)
@@ -92,13 +96,16 @@ export async function POST(request) {
           listing_id: item.listing_id,
           renter_id: session.user.id,
           lender_id: item.listings.owner_id,
-          rental_start: startDate.toISOString().split('T')[0],
+          rental_start: itemStartDate.toISOString().split('T')[0],
           rental_end: endDate.toISOString().split('T')[0],
           days: item.days,
           rental_price: subtotal,
           security_deposit: item.listings.security_deposit,
           total_amount: total,
           status: 'confirmed',
+          payment_status: 'paid',
+          fulfillment_status: 'pending',
+          lister_earnings: Math.round(subtotal * 0.85),
           payment_id: paymentId,
           order_id: orderId
         })
@@ -111,6 +118,15 @@ export async function POST(request) {
       }
       
       bookings.push(booking)
+
+      await sendBookingConfirmationEmail({
+        to: renter?.email,
+        renterName: renter?.name,
+        listingName: item.listings.title,
+        rentalStart: booking.rental_start,
+        rentalEnd: booking.rental_end,
+        totalAmount: Number(booking.total_amount || 0),
+      }).catch((emailError) => console.error("Booking email error:", emailError))
 
       // Mark listing as unavailable
       await supabaseAdmin

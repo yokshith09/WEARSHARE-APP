@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Script from "next/script";
 import { ArrowLeft, ShieldCheck, CreditCard, Lock, CheckCircle2 } from "lucide-react";
+import { trackEvent } from "@/lib/analytics";
 
 export default function CheckoutPage() {
   const [items, setItems] = useState<any[]>([]);
@@ -38,8 +39,14 @@ export default function CheckoutPage() {
   const handlePayment = async () => {
     if (items.length === 0) return;
     setProcessing(true);
+    trackEvent("booking_started", {
+      items: items.length,
+      subtotal,
+      deposit,
+      total,
+    });
     try {
-      const res = await fetch("/api/checkout", {
+      const res = await fetch("/api/payments/create-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rentalStart: new Date().toISOString() }),
@@ -74,7 +81,11 @@ export default function CheckoutPage() {
 
           const confirmData = await confirmRes.json();
           if (confirmData.success) {
-            router.push("/dashboard?checkout=success");
+            trackEvent("booking_completed", {
+              bookings: confirmData.bookings,
+              amount: total,
+            });
+            router.push("/dashboard/renter?checkout=success");
           } else {
             alert("Payment verification failed. Please contact support.");
           }

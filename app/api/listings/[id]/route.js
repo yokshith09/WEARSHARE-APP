@@ -1,10 +1,21 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '../../auth/[...nextauth]/route'
+import { authOptions } from "@/lib/authOptions"
+import { getListing } from '@/lib/listings'
+
+// Simple regex to check if string is a valid UUID
+const isUUID = (str) => /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(str);
 
 export async function GET(request, { params }) {
   try {
+    // If it's not a UUID, it's one of our static seeded demo listings
+    if (!isUUID(params.id)) {
+      const demoListing = getListing(params.id);
+      if (demoListing) return NextResponse.json(demoListing);
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+
     const { data: listing, error } = await supabaseAdmin
       .from('listings')
       .select(`
@@ -33,6 +44,9 @@ export async function GET(request, { params }) {
       title: listing.title,
       description: listing.description,
       category: listing.category,
+      occasion: listing.occasion,
+      gender: listing.gender,
+      listingType: listing.listing_type,
       size: listing.size,
       condition: listing.condition,
       rentalPricePerDay: listing.rental_price_per_day,
@@ -40,7 +54,11 @@ export async function GET(request, { params }) {
       securityDeposit: listing.security_deposit,
       deposit: listing.security_deposit,
       imageUrl: listing.image_url,
+      photoUrls: listing.photo_urls || (listing.image_url ? [listing.image_url] : []),
       image: listing.image_url,
+      pincode: listing.pincode,
+      area: listing.area,
+      retailPrice: listing.retail_price,
       available: listing.available,
       ownerId: listing.owner ? {
         _id: listing.owner.id,

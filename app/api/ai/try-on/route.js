@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import Replicate from 'replicate';
-import { verifyToken, getTokenFromRequest } from '@/lib/auth';
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/authOptions";
 
 const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN,
@@ -8,9 +9,8 @@ const replicate = new Replicate({
 
 export async function POST(req) {
   try {
-    const token = getTokenFromRequest(req);
-    const user = token ? verifyToken(token) : null;
-    if (!user) return NextResponse.json({ error: 'Unauthorized. Please login to use AI Try-On.' }, { status: 401 });
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user) return NextResponse.json({ error: 'Unauthorized. Please login to use AI Try-On.' }, { status: 401 });
 
     const { personImage, garmentImage, category = 'Upper-body' } = await req.json();
 

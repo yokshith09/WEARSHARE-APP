@@ -1,3 +1,5 @@
+import { redis } from "@/lib/redis";
+
 export const rateLimit = (options?: {
   interval?: number;
   uniqueTokenPerInterval?: number;
@@ -7,8 +9,20 @@ export const rateLimit = (options?: {
   const limit = options?.uniqueTokenPerInterval || 10;
 
   return {
-    check: (limit: number, token: string) =>
-      new Promise<void>((resolve, reject) => {
+    check: async (limit: number, token: string) => {
+      if (redis) {
+        const key = `rate:${token}`;
+        const count = await redis.incr(key);
+        if (count === 1) {
+          await redis.expire(key, Math.ceil(interval / 1000));
+        }
+        if (count > limit) {
+          throw new Error("Rate limit exceeded");
+        }
+        return;
+      }
+
+      return new Promise<void>((resolve, reject) => {
         const tokenCount = tokenCache.get(token) || [0];
         if (tokenCount[0] === 0) {
           tokenCache.set(token, [1]);
@@ -25,7 +39,8 @@ export const rateLimit = (options?: {
             resolve();
           }
         }
-      }),
+      });
+    },
   };
 };
 
