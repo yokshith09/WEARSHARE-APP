@@ -97,9 +97,18 @@ export default function CheckoutPage() {
         theme: {
           color: "#9333EA",
         },
+        modal: {
+          ondismiss: function () {
+            alert("Payment was cancelled.");
+          },
+        },
       };
 
       const rzp = new (window as any).Razorpay(options);
+      rzp.on("payment.failed", function (response: any) {
+        const reason = response?.error?.description || "Payment failed. Please try again.";
+        alert(reason);
+      });
       rzp.open();
     } catch (err) {
       console.error(err);
