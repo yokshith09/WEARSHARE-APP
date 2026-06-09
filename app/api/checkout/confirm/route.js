@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
+import Razorpay from 'razorpay'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getServerSession } from 'next-auth'
 import { authOptions } from "@/lib/authOptions"
@@ -28,6 +29,7 @@ export async function POST(request) {
     }
 
     let itemsToProcess = []
+    let expectedTotalAmount = 0
     
     if (listingId) {
       const { data: listing, error } = await supabaseAdmin
@@ -37,12 +39,19 @@ export async function POST(request) {
         .single()
 
       if (error || !listing) return NextResponse.json({ error: 'Listing not found' }, { status: 404 })
+      if (listing.owner_id === session.user.id) {
+        return NextResponse.json({ error: 'You cannot rent your own listing' }, { status: 400 })
+      }
       
       itemsToProcess = [{
         listing_id: listingId,
         days: parseInt(days) || 1,
         listings: listing
       }]
+
+      const subtotal = listing.rental_price_per_day * (parseInt(days) || 1)
+      const platformFee = Math.round((subtotal + listing.security_deposit) * 0.05)
+      expectedTotalAmount = subtotal + listing.security_deposit + platformFee
     } else {
       const { data: cart } = await supabaseAdmin
         .from('carts')
@@ -67,6 +76,31 @@ export async function POST(request) {
         return NextResponse.json({ error: 'Cart is empty' }, { status: 400 })
       }
       itemsToProcess = cartItems
+      expectedTotalAmount = cartItems.reduce((sum, item) => {
+        const subtotal = item.listings.rental_price_per_day * item.days
+        const platformFee = Math.round((subtotal + item.listings.security_deposit) * 0.05)
+        return sum + subtotal + item.listings.security_deposit + platformFee
+      }, 0)
+    }
+
+    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+      return NextResponse.json({ error: 'Razorpay keys are not configured.' }, { status: 500 })
+    }
+
+    const razorpay = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    })
+
+    const order = await razorpay.orders.fetch(orderId)
+    const orderUserId = order?.notes?.userId
+
+    if (orderUserId !== session.user.id) {
+      return NextResponse.json({ error: 'Payment order does not belong to this user.' }, { status: 400 })
+    }
+
+    if (Number(order.amount) !== Math.round(expectedTotalAmount * 100)) {
+      return NextResponse.json({ error: 'Payment amount does not match the booking total.' }, { status: 400 })
     }
 
     const { data: renter } = await supabaseAdmin
