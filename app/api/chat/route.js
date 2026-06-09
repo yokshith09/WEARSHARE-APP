@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/authOptions"
 import { getGeminiModel } from "@/lib/gemini"
-import { apiLimiter } from "@/lib/rate-limit"
+import { apiLimiter, dailyLimiter } from "@/lib/rate-limit"
 import {
   loadChatHistory,
   requiresListingSearch,
@@ -10,15 +12,22 @@ import {
 } from "@/lib/rag"
 
 export async function POST(request) {
+  const session = await getServerSession(authOptions)
+  const userId = session?.user?.id || null
+  const ip = request.headers.get("x-forwarded-for") || "unknown"
+  const actorKey = userId ? `user:${userId}` : `ip:${ip}`
+  const perMinuteLimit = Number(process.env.GEMINI_CHAT_PER_MINUTE_LIMIT || 10)
+  const dailyLimit = Number(process.env.GEMINI_CHAT_DAILY_LIMIT || 100)
+
   try {
-    const ip = request.headers.get("x-forwarded-for") || "unknown"
-    await apiLimiter.check(20, `chat:${ip}`)
+    await apiLimiter.check(perMinuteLimit, `chat:${actorKey}`)
+    await dailyLimiter.check(dailyLimit, `gemini-chat:${actorKey}`)
   } catch {
-    return NextResponse.json({ error: "Too many chat messages. Please try again later." }, { status: 429 })
+    return NextResponse.json({ error: "Chat limit reached. Please try again later." }, { status: 429 })
   }
 
   try {
-    const { message, sessionId = "default-session", userId } = await request.json()
+    const { message, sessionId = "default-session" } = await request.json()
     if (!message || String(message).trim().length < 2) {
       return NextResponse.json({ error: "Message is required" }, { status: 400 })
     }

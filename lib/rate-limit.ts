@@ -49,3 +49,8 @@ export const apiLimiter = rateLimit({
   interval: 60 * 1000, // 60 seconds
   uniqueTokenPerInterval: 500, // Max 500 users per interval
 });
+
+export const dailyLimiter = rateLimit({
+  interval: 24 * 60 * 60 * 1000, // 24 hours
+  uniqueTokenPerInterval: 5000,
+});
