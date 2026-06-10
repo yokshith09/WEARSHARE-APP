@@ -95,6 +95,9 @@ CREATE TABLE public.bookings (
     payment_status VARCHAR(50) DEFAULT 'pending',
     fulfillment_status VARCHAR(50) DEFAULT 'pending',
     notification_status VARCHAR(50) DEFAULT 'pending',
+    refund_status VARCHAR(50) DEFAULT 'none',
+    refund_id VARCHAR(255),
+    refund_amount NUMERIC(10, 2),
     pickup_location TEXT,
     pickup_time TIMESTAMPTZ,
     return_location TEXT,
@@ -167,6 +170,17 @@ CREATE TABLE public.chat_sessions (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE public.security_events (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    event_type VARCHAR(120) NOT NULL,
+    severity VARCHAR(20) NOT NULL DEFAULT 'info',
+    actor_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+    ip_hash TEXT,
+    user_agent_hash TEXT,
+    metadata JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 CREATE INDEX idx_listings_available_created_at ON public.listings (available, created_at DESC);
 CREATE INDEX idx_listings_category_size_price ON public.listings (category, size, rental_price_per_day);
 CREATE INDEX idx_listings_pincode ON public.listings (pincode);
@@ -175,6 +189,8 @@ CREATE INDEX idx_bookings_renter ON public.bookings (renter_id, created_at DESC)
 CREATE INDEX idx_bookings_lender ON public.bookings (lender_id, created_at DESC);
 CREATE INDEX idx_listing_embeddings_vector ON public.listing_embeddings USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
 CREATE INDEX idx_chat_sessions_session ON public.chat_sessions (session_id, created_at DESC);
+CREATE INDEX idx_security_events_type_created ON public.security_events (event_type, created_at DESC);
+CREATE INDEX idx_security_events_actor_created ON public.security_events (actor_id, created_at DESC);
 
 CREATE OR REPLACE FUNCTION public.match_listings(
   query_embedding vector(768),
@@ -205,6 +221,7 @@ ALTER TABLE public.reviews ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.waitlist_signups ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.listing_embeddings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.chat_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.security_events ENABLE ROW LEVEL SECURITY;
 
 -- Allow public read access to active listings
 CREATE POLICY "Public profiles are viewable by everyone." ON public.users FOR SELECT USING (true);

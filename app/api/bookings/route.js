@@ -42,6 +42,9 @@ export async function GET(request) {
       listerEarnings: b.lister_earnings,
       paymentStatus: b.payment_status,
       fulfillmentStatus: b.fulfillment_status,
+      refundStatus: b.refund_status,
+      refundId: b.refund_id,
+      refundAmount: b.refund_amount,
       status: b.status,
       deliveryStatus: b.status, // temporary map if delivery isn't explicit
       createdAt: b.created_at,

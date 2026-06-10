@@ -108,6 +108,9 @@ CREATE TABLE IF NOT EXISTS public.bookings (
     payment_status VARCHAR(50) DEFAULT 'pending',
     fulfillment_status VARCHAR(50) DEFAULT 'pending',
     notification_status VARCHAR(50) DEFAULT 'pending',
+    refund_status VARCHAR(50) DEFAULT 'none',
+    refund_id VARCHAR(255),
+    refund_amount NUMERIC(10, 2),
     pickup_location TEXT,
     pickup_time TIMESTAMPTZ,
     return_location TEXT,
@@ -120,6 +123,9 @@ CREATE TABLE IF NOT EXISTS public.bookings (
 ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS payment_status VARCHAR(50) DEFAULT 'pending';
 ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS fulfillment_status VARCHAR(50) DEFAULT 'pending';
 ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS notification_status VARCHAR(50) DEFAULT 'pending';
+ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS refund_status VARCHAR(50) DEFAULT 'none';
+ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS refund_id VARCHAR(255);
+ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS refund_amount NUMERIC(10, 2);
 ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS pickup_location TEXT;
 ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS pickup_time TIMESTAMPTZ;
 ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS return_location TEXT;
@@ -192,6 +198,17 @@ CREATE TABLE IF NOT EXISTS public.chat_sessions (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS public.security_events (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    event_type VARCHAR(120) NOT NULL,
+    severity VARCHAR(20) NOT NULL DEFAULT 'info',
+    actor_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+    ip_hash TEXT,
+    user_agent_hash TEXT,
+    metadata JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 CREATE INDEX IF NOT EXISTS idx_listings_available_created_at ON public.listings (available, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_listings_category_size_price ON public.listings (category, size, rental_price_per_day);
 CREATE INDEX IF NOT EXISTS idx_listings_pincode ON public.listings (pincode);
@@ -202,6 +219,8 @@ CREATE INDEX IF NOT EXISTS idx_chat_sessions_session ON public.chat_sessions (se
 CREATE INDEX IF NOT EXISTS idx_listing_embeddings_vector ON public.listing_embeddings
 USING ivfflat (embedding vector_cosine_ops)
 WITH (lists = 100);
+CREATE INDEX IF NOT EXISTS idx_security_events_type_created ON public.security_events (event_type, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_security_events_actor_created ON public.security_events (actor_id, created_at DESC);
 
 CREATE OR REPLACE FUNCTION public.match_listings(
   query_embedding vector(768),
@@ -231,6 +250,7 @@ ALTER TABLE public.reviews ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.waitlist_signups ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.listing_embeddings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.chat_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.security_events ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Public profiles are viewable by everyone." ON public.users;
 DROP POLICY IF EXISTS "Available listings are viewable by everyone." ON public.listings;

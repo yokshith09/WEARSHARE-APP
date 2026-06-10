@@ -7,7 +7,7 @@ import { DashboardTabs } from "@/components/dashboard-tabs";
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions);
 
-  if (!session) {
+  if (!session?.user || !(session.user as any).id) {
     redirect("/api/auth/signin");
   }
 
