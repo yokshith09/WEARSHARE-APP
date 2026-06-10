@@ -17,7 +17,7 @@ Configure SMS channel supported by Supabase in your project.
 
 ## 2) NextAuth
 
-- `NEXTAUTH_URL`: deployed app URL, e.g. `https://wearshare.in`
+- `NEXTAUTH_URL`: deployed app URL, e.g. `https://wearshare.qzz.io`
 - `NEXTAUTH_SECRET`: generate 32+ random bytes
 
 PowerShell example:
@@ -110,13 +110,13 @@ Open Cloudflare Dashboard -> R2 -> bucket -> API Tokens / S3 API.
 
 - `INGEST_SECRET`: random secret for `/api/ingest`
 - `WEBHOOK_SECRET`: random secret for `/api/webhooks/listing`
-- `ALLOWED_ORIGINS`: comma-separated origins, e.g. `https://wearshare.in,https://www.wearshare.in,http://localhost:3000`
+- `ALLOWED_ORIGINS`: comma-separated origins, e.g. `https://wearshare.qzz.io,http://localhost:3000`
 
 ## 11) Deploy Checklist
 
 1. Put all keys into local `.env.local`.
 2. Put same keys in Vercel (`Production` + `Preview`).
-3. Apply [supabase_schema.sql](E:/New folder/wearshare-app/supabase_schema.sql) in live Supabase SQL editor.
+3. If the database is new and empty, apply [supabase_schema.sql](E:/New folder/wearshare-app/supabase_schema.sql). If tables already exist, apply [supabase_safe_apply.sql](E:/New folder/wearshare-app/supabase_safe_apply.sql) instead.
 4. Trigger ingest:
 
 ```bash

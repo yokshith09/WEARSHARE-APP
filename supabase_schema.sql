@@ -1,4 +1,6 @@
 -- Supabase PostgreSQL Schema for WearShare
+-- Use this file only for a brand-new empty database.
+-- If tables already exist, run supabase_safe_apply.sql instead.
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
