@@ -56,8 +56,8 @@ Open [Google AI Studio](https://aistudio.google.com/app/apikey).
 
 Open PostHog -> Project Settings -> API Keys.
 
-- `NEXT_PUBLIC_POSTHOG_KEY`: project API key
-- `NEXT_PUBLIC_POSTHOG_HOST`: usually `https://app.posthog.com`
+- `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN`: project token (`phc_...`)
+- `NEXT_PUBLIC_POSTHOG_HOST`: `https://eu.i.posthog.com` for the EU region
 
 ## 6) Sentry
 
@@ -66,14 +66,18 @@ Open Sentry -> Project Settings -> Client Keys (DSN):
 - `NEXT_PUBLIC_SENTRY_DSN`: DSN
 - `SENTRY_DSN`: same DSN is acceptable
 
-Open Sentry -> Settings -> Auth Tokens:
+For this project:
 
-- `SENTRY_AUTH_TOKEN`
+- `SENTRY_ORG=yokshiths-org`
+- `SENTRY_PROJECT=javascript-nextjs`
 
-From Sentry org/project URLs:
+The URL `.../settings/projects/javascript-nextjs/keys/` is the settings page, not
+the DSN. Copy the DSN value displayed on that page.
 
-- `SENTRY_ORG`
-- `SENTRY_PROJECT`
+`SENTRY_AUTH_TOKEN` is optional for runtime error reporting. It is only needed
+during builds that upload source maps. Create it under Organization Settings ->
+Developer Settings -> Custom Integrations, and store it only in the private
+build or CI secret store.
 
 ## 7) Resend
 

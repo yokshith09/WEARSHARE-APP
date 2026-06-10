@@ -17,7 +17,9 @@ export type AnalyticsEvent =
 export function initAnalytics() {
   if (initialized || typeof window === "undefined") return;
 
-  const key = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+  const key =
+    process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN ||
+    process.env.NEXT_PUBLIC_POSTHOG_KEY;
   if (!key) return;
 
   posthog.init(key, {

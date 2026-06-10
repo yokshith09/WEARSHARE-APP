@@ -4,18 +4,25 @@ import { apiLimiter } from "@/lib/rate-limit"
 
 export async function POST(request) {
   try {
-    const ip = request.headers.get("x-forwarded-for") || "unknown"
-    await apiLimiter.check(3, `otp:${ip}`)
-  } catch {
-    return NextResponse.json({ error: "Too many OTP requests. Please try again later." }, { status: 429 })
-  }
-
-  try {
     const { phone } = await request.json()
     const normalizedPhone = String(phone || "").replace(/\s/g, "")
 
     if (!/^\+91\d{10}$/.test(normalizedPhone)) {
       return NextResponse.json({ error: "Enter a valid Indian phone number in +91 format." }, { status: 400 })
+    }
+
+    const forwardedFor = request.headers.get("x-forwarded-for")
+    const ip = forwardedFor?.split(",")[0]?.trim() || "unknown"
+    try {
+      await Promise.all([
+        apiLimiter.check(3, `otp-send:ip:${ip}`),
+        apiLimiter.check(3, `otp-send:phone:${normalizedPhone}`),
+      ])
+    } catch {
+      return NextResponse.json(
+        { error: "Too many OTP requests. Please try again later." },
+        { status: 429 }
+      )
     }
 
     const { error } = await supabasePublic.auth.signInWithOtp({
@@ -26,7 +33,8 @@ export async function POST(request) {
     })
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      console.error("[auth/send-otp] provider rejected OTP request:", error.message)
+      return NextResponse.json({ error: "Unable to send OTP right now." }, { status: 503 })
     }
 
     return NextResponse.json({ success: true })

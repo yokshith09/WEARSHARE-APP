@@ -18,12 +18,14 @@ function withCors(req: NextRequest, res: NextResponse) {
   const origin = req.headers.get("origin") || "";
   const allowed = (process.env.ALLOWED_ORIGINS || "http://localhost:3000")
     .split(",")
-    .map((s) => s.trim());
-  if (allowed.some((prefix) => origin.startsWith(prefix))) {
+    .map((s) => s.trim().replace(/\/$/, ""))
+    .filter(Boolean);
+  const normalizedOrigin = origin.replace(/\/$/, "");
+  if (origin && allowed.includes(normalizedOrigin)) {
     res.headers.set("Access-Control-Allow-Origin", origin);
     res.headers.set("Vary", "Origin");
   }
-  res.headers.set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.headers.set("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
   res.headers.set("Access-Control-Allow-Headers", "Content-Type,Authorization,x-webhook-secret");
   return res;
 }
@@ -60,4 +62,3 @@ export function middleware(req: NextRequest) {
 export const config = {
   matcher: ["/api/:path*"],
 };
-

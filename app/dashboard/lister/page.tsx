@@ -29,21 +29,29 @@ export default function ListerDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bookingId, deliveryStatus: newStatus }),
       });
-      if (res.ok) {
-        setData((prev: any) => ({
-          ...prev,
-          lending: prev.lending.map((b: any) =>
-            b.id === bookingId ? { ...b, status: newStatus } : b
-          ),
-        }));
+      const result = await res.json();
+      if (!res.ok) {
+        throw new Error(result.error || "Unable to update booking");
       }
+
+      setData((prev: any) => ({
+        ...prev,
+        lending: prev.lending.map((b: any) =>
+          b.id === bookingId ? { ...b, status: newStatus } : b
+        ),
+      }));
     } catch (err) {
       console.error("Failed to update status", err);
+      alert(err instanceof Error ? err.message : "Unable to update booking");
     }
   };
 
-  const pendingRequests = (data?.lending || []).filter((b: any) => b.status === 'pending');
-  const inventoryRentals = (data?.lending || []).filter((b: any) => b.status !== 'pending');
+  const pendingRequests = (data?.lending || []).filter(
+    (b: any) => b.status === 'pending' || b.status === 'confirmed'
+  );
+  const inventoryRentals = (data?.lending || []).filter(
+    (b: any) => b.status !== 'pending' && b.status !== 'confirmed'
+  );
 
   useEffect(() => {
     Promise.all([
@@ -220,9 +228,11 @@ export default function ListerDashboard() {
                     </p>
                   </div>
                   <div className="flex gap-2 w-full sm:w-auto">
-                    <button onClick={() => handleStatusChange(booking.id, 'declined')} className="flex-1 sm:flex-none px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 font-medium rounded-md text-sm transition-colors">
-                      Decline
-                    </button>
+                    {booking.status === 'pending' && (
+                      <button onClick={() => handleStatusChange(booking.id, 'declined')} className="flex-1 sm:flex-none px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 font-medium rounded-md text-sm transition-colors">
+                        Decline
+                      </button>
+                    )}
                     <button onClick={() => handleStatusChange(booking.id, 'active')} className="flex-1 sm:flex-none px-4 py-2 bg-primary text-white hover:bg-primary/90 font-medium rounded-md text-sm transition-colors">
                       Approve
                     </button>

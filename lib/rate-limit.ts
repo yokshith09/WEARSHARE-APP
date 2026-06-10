@@ -41,6 +41,14 @@ export const rateLimit = (options?: {
         }
       });
     },
+    reset: async (token: string) => {
+      if (redis) {
+        await redis.del(`rate:${token}`);
+        return;
+      }
+
+      tokenCache.delete(token);
+    },
   };
 };
 
@@ -53,4 +61,9 @@ export const apiLimiter = rateLimit({
 export const dailyLimiter = rateLimit({
   interval: 24 * 60 * 60 * 1000, // 24 hours
   uniqueTokenPerInterval: 5000,
+});
+
+export const otpVerificationLimiter = rateLimit({
+  interval: 15 * 60 * 1000, // 15 minutes
+  uniqueTokenPerInterval: 1000,
 });
