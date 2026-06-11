@@ -17,6 +17,12 @@ Configure SMS channel supported by Supabase in your project.
 If OTP still fails, check the provider error text in the login page and verify
 the Supabase phone/SMS provider settings first.
 
+Google OAuth callback fix:
+
+Run [supabase_safe_apply.sql](E:/New folder/wearshare-app/supabase_safe_apply.sql)
+after this update. The Google callback uses the NextAuth Supabase adapter, which
+needs the `next_auth` schema tables in Supabase.
+
 ## 2) NextAuth
 
 - `NEXTAUTH_URL`: deployed app URL, e.g. `https://wearshare.qzz.io`
@@ -95,6 +101,21 @@ Open [Resend Dashboard](https://resend.com/) -> API Keys:
 Add and verify sender domain/address:
 
 - `RESEND_FROM_EMAIL`: e.g. `WearShare <bookings@wearshare.in>`
+
+Until you own/verify `wearshare.in`, use a verified Resend sender such as
+`onboarding@resend.dev` for testing. After the domain is verified, recommended
+addresses are:
+
+- `WearShare <noreply@wearshare.in>` for OTPs
+- `WearShare Support <support@wearshare.in>` for support
+- `WearShare Updates <updates@wearshare.in>` for newsletters
+
+Implemented email routes:
+
+- `POST /api/email/send-otp`
+- NextAuth provider `email-otp`
+- `POST /api/newsletter`
+- `POST /api/password/request-reset`
 
 ## 8) Upstash Redis
 

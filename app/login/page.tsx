@@ -2,32 +2,36 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import Image from "next/image";
-import { ArrowRight, Phone, MessageSquare } from "lucide-react";
+import { ArrowRight, Mail, Phone, MessageSquare } from "lucide-react";
 import heroImg from "@/assets/hero-lehenga.jpg"; // Reusing an image for the background/side
 
 export default function LoginPage() {
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
+  const [method, setMethod] = useState<"phone" | "email">("email");
   const [step, setStep] = useState<"phone" | "otp">("phone");
   const [loading, setLoading] = useState(false);
 
   const handleSendOtp = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phone) return;
+    if (method === "phone" && !phone) return;
+    if (method === "email" && !email) return;
     setLoading(true);
     const normalizedPhone = phone.replace(/\s/g, "").startsWith("+91")
       ? phone.replace(/\s/g, "")
       : `+91${phone.replace(/\D/g, "").slice(-10)}`;
 
-    fetch("/api/auth/send-otp", {
+    fetch(method === "phone" ? "/api/auth/send-otp" : "/api/email/send-otp", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phone: normalizedPhone }),
+      body: JSON.stringify(method === "phone" ? { phone: normalizedPhone } : { email }),
     })
       .then(async (res) => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Unable to send OTP");
-        setPhone(normalizedPhone);
+        if (method === "phone") setPhone(normalizedPhone);
+        if (method === "email") setEmail(email.trim().toLowerCase());
         setStep("otp");
       })
       .catch((err) => {
@@ -42,8 +46,9 @@ export default function LoginPage() {
     e.preventDefault();
     if (!otp) return;
     setLoading(true);
-    const res = await signIn("msg91-otp", {
+    await signIn(method === "phone" ? "msg91-otp" : "email-otp", {
       phone,
+      email,
       otp,
       callbackUrl: "/dashboard/renter",
     });
@@ -104,25 +109,54 @@ export default function LoginPage() {
 
             {step === "phone" ? (
               <form onSubmit={handleSendOtp} className="space-y-4">
+                <div className="grid grid-cols-2 gap-2 rounded-xl bg-secondary p-1">
+                  <button
+                    type="button"
+                    onClick={() => setMethod("email")}
+                    className={`rounded-lg py-2 text-xs font-medium transition-colors ${method === "email" ? "bg-background text-ink shadow-sm" : "text-muted-foreground"}`}
+                  >
+                    Email
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMethod("phone")}
+                    className={`rounded-lg py-2 text-xs font-medium transition-colors ${method === "phone" ? "bg-background text-ink shadow-sm" : "text-muted-foreground"}`}
+                  >
+                    Phone
+                  </button>
+                </div>
                 <div>
-                  <label className="block text-sm font-medium text-ink mb-1.5">Phone Number</label>
+                  <label className="block text-sm font-medium text-ink mb-1.5">
+                    {method === "email" ? "Email address" : "Phone Number"}
+                  </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-muted-foreground">
-                      <Phone className="h-4 w-4" />
+                      {method === "email" ? <Mail className="h-4 w-4" /> : <Phone className="h-4 w-4" />}
                     </div>
-                    <input
-                      type="tel"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="+91 99999 99999"
-                      className="w-full bg-background border border-border rounded-xl pl-10 pr-4 py-3 text-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all"
-                      required
-                    />
+                    {method === "email" ? (
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="you@example.com"
+                        className="w-full bg-background border border-border rounded-xl pl-10 pr-4 py-3 text-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all"
+                        required
+                      />
+                    ) : (
+                      <input
+                        type="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="+91 99999 99999"
+                        className="w-full bg-background border border-border rounded-xl pl-10 pr-4 py-3 text-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all"
+                        required
+                      />
+                    )}
                   </div>
                 </div>
                 <button
                   type="submit"
-                  disabled={loading || !phone}
+                  disabled={loading || (method === "phone" ? !phone : !email)}
                   className="w-full btn-primary py-3.5 text-sm font-medium flex justify-center items-center gap-2"
                 >
                   {loading ? "Sending OTP..." : "Get OTP"}
@@ -147,7 +181,7 @@ export default function LoginPage() {
                     />
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">
-                    Sent to {phone}. <button type="button" onClick={() => setStep("phone")} className="text-primary hover:underline">Change</button>
+                    Sent to {method === "phone" ? phone : email}. <button type="button" onClick={() => setStep("phone")} className="text-primary hover:underline">Change</button>
                   </p>
                 </div>
                 <button

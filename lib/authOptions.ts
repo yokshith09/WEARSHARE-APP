@@ -5,8 +5,10 @@ import { SupabaseAdapter } from "@next-auth/supabase-adapter"
 import { supabaseAdmin, supabasePublic } from "@/lib/supabase"
 import { otpVerificationLimiter } from "@/lib/rate-limit"
 import { randomUUID } from "crypto"
+import bcrypt from "bcryptjs"
 import { isActiveSession, releaseActiveSession, setActiveSession } from "@/lib/redis"
 import { recordSecurityEvent } from "@/lib/security-events"
+import { sendEmail, wearShareEmailShell } from "@/lib/resend-email"
 
 const SESSION_MAX_AGE_SECONDS = 24 * 60 * 60
 const SESSION_ABSOLUTE_MAX_AGE_SECONDS = 7 * 24 * 60 * 60
@@ -102,6 +104,118 @@ export const authOptions: NextAuthOptions = {
           phone,
         }
       }
+    }),
+    CredentialsProvider({
+      id: "email-otp",
+      name: "Email OTP",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        otp: { label: "OTP", type: "text" },
+      },
+      async authorize(credentials, request) {
+        const email = String(credentials?.email || "").trim().toLowerCase()
+        const otp = String(credentials?.otp || "").trim()
+        const forwardedFor = request?.headers?.["x-forwarded-for"]
+        const ip = Array.isArray(forwardedFor)
+          ? forwardedFor[0]
+          : String(forwardedFor || "unknown").split(",")[0].trim()
+        const userAgent = String(request?.headers?.["user-agent"] || "unknown")
+
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !/^\d{6}$/.test(otp)) {
+          await recordSecurityEvent({
+            eventType: "auth.email_otp.invalid_input",
+            severity: "info",
+            ip,
+            userAgent,
+          })
+          return null
+        }
+
+        try {
+          await otpVerificationLimiter.check(5, `email-otp-verify:${email}`)
+          await otpVerificationLimiter.check(20, `email-otp-verify:ip:${ip}`)
+        } catch {
+          await recordSecurityEvent({
+            eventType: "auth.email_otp.verification_locked",
+            severity: "warning",
+            ip,
+            userAgent,
+          })
+          return null
+        }
+
+        const { data: rows, error } = await supabaseAdmin
+          .from("email_otps")
+          .select("id,email,otp_hash,expires_at,used_at")
+          .eq("email", email)
+          .is("used_at", null)
+          .order("created_at", { ascending: false })
+          .limit(1)
+
+        const row = rows?.[0]
+        if (error || !row || new Date(row.expires_at).getTime() < Date.now()) {
+          await recordSecurityEvent({
+            eventType: "auth.email_otp.verification_failed",
+            severity: "info",
+            ip,
+            userAgent,
+          })
+          return null
+        }
+
+        const matches = await bcrypt.compare(otp, row.otp_hash)
+        if (!matches) {
+          await recordSecurityEvent({
+            eventType: "auth.email_otp.verification_failed",
+            severity: "info",
+            ip,
+            userAgent,
+          })
+          return null
+        }
+
+        await supabaseAdmin
+          .from("email_otps")
+          .update({ used_at: new Date().toISOString() })
+          .eq("id", row.id)
+
+        await otpVerificationLimiter.reset(`email-otp-verify:${email}`)
+        await otpVerificationLimiter.reset(`email-otp-verify:ip:${ip}`)
+
+        const { data: existingUser } = await supabaseAdmin
+          .from("users")
+          .select("id,name,email")
+          .eq("email", email)
+          .maybeSingle()
+
+        const userId = existingUser?.id || randomUUID()
+        const name = existingUser?.name || email.split("@")[0]
+
+        await supabaseAdmin
+          .from("users")
+          .upsert({
+            id: userId,
+            email,
+            name,
+            email_verified: new Date().toISOString(),
+            is_verified: true,
+          }, { onConflict: "id" })
+
+        await sendEmail(
+          email,
+          "Welcome to WearShare",
+          wearShareEmailShell(`
+            <h2 style="font-size:22px;margin:0 0 12px">Welcome to WearShare</h2>
+            <p>Thanks for joining. You can now rent and list outfits securely.</p>
+          `)
+        ).catch(() => null)
+
+        return {
+          id: userId,
+          name,
+          email,
+        }
+      }
     })
   ],
   adapter: SupabaseAdapter({
@@ -120,6 +234,7 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id
         token.phone = (user as any).phone
+        token.email = (user as any).email
         token.sessionId = randomUUID()
         token.rotationId = randomUUID()
         token.authenticatedAt = Math.floor(Date.now() / 1000)
@@ -178,6 +293,19 @@ export const authOptions: NextAuthOptions = {
   },
   events: {
     async signIn({ user, account }) {
+      if (account?.provider === "google" && user?.id) {
+        await supabaseAdmin
+          .from("users")
+          .upsert({
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            image: user.image,
+            email_verified: new Date().toISOString(),
+            is_verified: true,
+          }, { onConflict: "id" })
+      }
+
       await recordSecurityEvent({
         eventType: "auth.sign_in.succeeded",
         actorId: user.id,

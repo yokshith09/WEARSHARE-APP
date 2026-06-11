@@ -5,6 +5,55 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS vector;
 
+CREATE SCHEMA IF NOT EXISTS next_auth;
+GRANT USAGE ON SCHEMA next_auth TO service_role;
+GRANT ALL ON SCHEMA next_auth TO postgres;
+
+CREATE TABLE IF NOT EXISTS next_auth.users (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    name TEXT,
+    email TEXT UNIQUE,
+    "emailVerified" TIMESTAMPTZ,
+    image TEXT
+);
+
+CREATE TABLE IF NOT EXISTS next_auth.accounts (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    type TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    "providerAccountId" TEXT NOT NULL,
+    refresh_token TEXT,
+    access_token TEXT,
+    expires_at BIGINT,
+    token_type TEXT,
+    scope TEXT,
+    id_token TEXT,
+    session_state TEXT,
+    oauth_token_secret TEXT,
+    oauth_token TEXT,
+    "userId" UUID REFERENCES next_auth.users(id) ON DELETE CASCADE,
+    UNIQUE(provider, "providerAccountId")
+);
+
+CREATE TABLE IF NOT EXISTS next_auth.sessions (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    expires TIMESTAMPTZ NOT NULL,
+    "sessionToken" TEXT UNIQUE NOT NULL,
+    "userId" UUID REFERENCES next_auth.users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS next_auth.verification_tokens (
+    identifier TEXT,
+    token TEXT UNIQUE NOT NULL,
+    expires TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (identifier, token)
+);
+
+GRANT ALL ON TABLE next_auth.users TO service_role;
+GRANT ALL ON TABLE next_auth.accounts TO service_role;
+GRANT ALL ON TABLE next_auth.sessions TO service_role;
+GRANT ALL ON TABLE next_auth.verification_tokens TO service_role;
+
 CREATE TABLE IF NOT EXISTS public.users (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     name VARCHAR(255),
@@ -22,6 +71,10 @@ CREATE TABLE IF NOT EXISTS public.users (
 );
 
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS phone VARCHAR(20);
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS name VARCHAR(255);
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS email VARCHAR(255);
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS email_verified TIMESTAMPTZ;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS image TEXT;
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT false;
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS rating NUMERIC(3, 2) DEFAULT 4.5;
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS address TEXT;
@@ -58,6 +111,34 @@ CREATE TABLE IF NOT EXISTS public.verification_tokens (
     expires TIMESTAMPTZ NOT NULL,
     PRIMARY KEY (identifier, token)
 );
+
+CREATE TABLE IF NOT EXISTS public.email_otps (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    email TEXT NOT NULL,
+    otp_hash TEXT NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    used_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_email_otps_email_created ON public.email_otps (email, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS public.subscribers (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.reset_tokens (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    email TEXT NOT NULL,
+    token_hash TEXT NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    used_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_reset_tokens_email_created ON public.reset_tokens (email, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS public.listings (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
