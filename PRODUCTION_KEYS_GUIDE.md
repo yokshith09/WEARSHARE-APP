@@ -14,6 +14,8 @@ Phone OTP:
 
 Open `Authentication` -> `Providers` -> `Phone` and enable provider.
 Configure SMS channel supported by Supabase in your project.
+If OTP still fails, check the provider error text in the login page and verify
+the Supabase phone/SMS provider settings first.
 
 ## 2) NextAuth
 
@@ -32,6 +34,8 @@ Open [Google Cloud Console](https://console.cloud.google.com/) -> APIs & Service
 
 - `GOOGLE_ID`: OAuth client ID
 - `GOOGLE_SECRET`: OAuth client secret
+- Authorized JavaScript origin: `https://wearshare.qzz.io`
+- Authorized redirect URI: `https://wearshare.qzz.io/api/auth/callback/google`
 
 If Google login is currently failing, these are the first two values to add.
 Without them, the sign-in button can render but the provider cannot complete auth.
@@ -143,3 +147,14 @@ curl -X POST https://your-domain/api/ingest \
 - `/api/chat` returns grounded listing answers
 - `/api/chat/stream` streams tokens
 - chat widget shows listing cards for fashion queries
+
+## 12) GitHub Actions Deploy
+
+If you want automatic deploys from GitHub, add these repository secrets:
+
+- `VERCEL_TOKEN`
+- `VERCEL_ORG_ID`
+- `VERCEL_PROJECT_ID`
+
+The workflow at [`.github/workflows/vercel-deploy.yml`](E:/New folder/wearshare-app/.github/workflows/vercel-deploy.yml)
+builds on pull requests and deploys `main` to Vercel automatically.

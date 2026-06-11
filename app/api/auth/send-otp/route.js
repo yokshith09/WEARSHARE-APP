@@ -34,7 +34,10 @@ export async function POST(request) {
 
     if (error) {
       console.error("[auth/send-otp] provider rejected OTP request:", error.message)
-      return NextResponse.json({ error: "Unable to send OTP right now." }, { status: 503 })
+      const message = /phone|sms|provider|disabled|not configured|rate/i.test(error.message || "")
+        ? error.message
+        : "Unable to send OTP right now."
+      return NextResponse.json({ error: message }, { status: 503 })
     }
 
     return NextResponse.json({ success: true })
