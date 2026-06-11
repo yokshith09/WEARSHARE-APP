@@ -8,12 +8,12 @@
     "start": "next start"
   },
   "dependencies": {
-    "@auth/supabase-adapter": "^1.11.2",
     "@aws-sdk/client-s3": "^3.1052.0",
     "@aws-sdk/s3-request-presigner": "^3.1052.0",
     "@google/generative-ai": "^0.24.1",
     "@gradio/client": "^2.1.0",
     "@hookform/resolvers": "^5.2.2",
+    "@next-auth/supabase-adapter": "^0.2.1",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-aspect-ratio": "^1.1.8",
@@ -55,7 +55,7 @@
     "mongoose": "^8.3.4",
     "next": "^14.2.35",
     "next-auth": "^4.24.14",
-    "nodemailer": "^8.0.1",
+    "nodemailer": "^7.0.13",
     "posthog-js": "^1.375.0",
     "razorpay": "^2.9.2",
     "react": "^18",

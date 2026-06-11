@@ -1,7 +1,7 @@
 import { NextAuthOptions } from "next-auth"
 import GoogleProvider from "next-auth/providers/google"
 import CredentialsProvider from "next-auth/providers/credentials"
-import { SupabaseAdapter } from "@auth/supabase-adapter"
+import { SupabaseAdapter } from "@next-auth/supabase-adapter"
 import { supabaseAdmin, supabasePublic } from "@/lib/supabase"
 import { otpVerificationLimiter } from "@/lib/rate-limit"
 import { randomUUID } from "crypto"
