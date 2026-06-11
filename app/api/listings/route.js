@@ -14,6 +14,7 @@ export async function GET(request) {
     const listingType = searchParams.get('listingType')
     const gender = searchParams.get('gender')
     const occasion = searchParams.get('occasion')
+    const city = searchParams.get('city')
     const pincode = searchParams.get('pincode')
     const userOnly = searchParams.get('user') || searchParams.get('mine')
 
@@ -42,11 +43,12 @@ export async function GET(request) {
     if (listingType) query = query.eq('listing_type', listingType) // Need to ensure schema has this if used
     if (gender) query = query.eq('gender', gender) // Need to ensure schema has this if used
     if (occasion) query = query.ilike('occasion', `%${occasion}%`)
-    if (pincode) query = query.eq('pincode', pincode)
+    if (city) query = query.ilike('city', `%${city}%`)
+    if (pincode) query = query.ilike('pincode', `%${pincode}%`)
     if (minPrice) query = query.gte('rental_price_per_day', Number(minPrice))
     if (maxPrice) query = query.lte('rental_price_per_day', Number(maxPrice))
     if (search) {
-      query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%,category.ilike.%${search}%`)
+      query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%,category.ilike.%${search}%,city.ilike.%${search}%,pincode.ilike.%${search}%`)
     }
 
     const { data: listings, error } = await query
@@ -73,6 +75,7 @@ export async function GET(request) {
       imageUrl: l.image_url,
       photoUrls: l.photo_urls || (l.image_url ? [l.image_url] : []),
       image: l.image_url,
+      city: l.city,
       pincode: l.pincode,
       area: l.area,
       retailPrice: l.retail_price,
@@ -133,6 +136,7 @@ export async function POST(request) {
         security_deposit: data.securityDeposit || data.deposit || 0,
         image_url: imageUrl,
         photo_urls: photoUrls.length ? photoUrls : [imageUrl],
+        city: data.city || null,
         pincode: data.pincode,
         area: data.area,
         retail_price: data.retailPrice || null,

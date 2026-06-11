@@ -71,6 +71,7 @@ CREATE TABLE public.listings (
     security_deposit NUMERIC(10, 2) DEFAULT 0,
     image_url TEXT,
     photo_urls TEXT[] DEFAULT '{}',
+    city VARCHAR(80),
     pincode VARCHAR(10),
     area VARCHAR(120),
     retail_price NUMERIC(10, 2),
@@ -185,6 +186,7 @@ CREATE TABLE public.security_events (
 
 CREATE INDEX idx_listings_available_created_at ON public.listings (available, created_at DESC);
 CREATE INDEX idx_listings_category_size_price ON public.listings (category, size, rental_price_per_day);
+CREATE INDEX idx_listings_city_pincode ON public.listings (city, pincode);
 CREATE INDEX idx_listings_pincode ON public.listings (pincode);
 CREATE INDEX idx_bookings_listing_dates ON public.bookings (listing_id, rental_start, rental_end);
 CREATE INDEX idx_bookings_renter ON public.bookings (renter_id, created_at DESC);

@@ -13,6 +13,7 @@ import { trackEvent } from "@/lib/analytics";
 
 const CATEGORIES = ["Lehenga", "Saree", "Sherwani", "Anarkali", "Gown", "Kurta", "Suit", "Indo-Western", "Blazer", "Tuxedo", "Co-ord Set", "Dhoti", "Accessories", "Shirt", "Pant"];
 const SIZES = ["XS", "S", "M", "L", "XL", "Free"];
+const CITIES = ["Bengaluru", "Coimbatore"];
 
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -123,6 +124,7 @@ function ListingForm() {
   const [retail, setRetail] = useState<number | "">("");
   const [pricePerDay, setPricePerDay] = useState<number | "">("");
   const [deposit, setDeposit] = useState<number | "">("");
+  const [city, setCity] = useState("Bengaluru");
   const [pincode, setPincode] = useState("");
   const [unavailable, setUnavailable] = useState<Date[] | undefined>([]);
   const [submitted, setSubmitted] = useState(false);
@@ -242,6 +244,7 @@ function ListingForm() {
           retailPrice: retail || null,
           pricePerDay,
           deposit,
+          city,
           pincode,
           photoUrls,
           imageUrl: photoUrls[0],
@@ -377,6 +380,11 @@ function ListingForm() {
                     className="form-input"
                     required
                   />
+                </Field>
+                <Field label="City">
+                  <select value={city} onChange={(e) => setCity(e.target.value)} className="form-input">
+                    {CITIES.map((c) => <option key={c}>{c}</option>)}
+                  </select>
                 </Field>
                 <Field label="Size">
                   <div className="flex gap-1.5 flex-wrap">
@@ -544,6 +552,7 @@ function ListingForm() {
                 setRetail("");
                 setPricePerDay("");
                 setDeposit("");
+                setCity("Bengaluru");
                 setUnavailable([]);
                 setError("");
               }}

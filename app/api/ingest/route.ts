@@ -13,8 +13,9 @@ function buildEmbeddableText(listing: Record<string, any>) {
     listing.occasion ? `Occasion: ${listing.occasion}` : "",
     listing.size ? `Size: ${listing.size}` : "",
     listing.condition ? `Condition: ${listing.condition}` : "",
-    `Rental price: ₹${Math.round(Number(listing.rental_price_per_day || 0))} per day`,
-    `Security deposit: ₹${Math.round(Number(listing.security_deposit || 0))}`,
+    `Rental price: Rs ${Math.round(Number(listing.rental_price_per_day || 0))} per day`,
+    `Security deposit: Rs ${Math.round(Number(listing.security_deposit || 0))}`,
+    listing.city ? `City: ${listing.city}` : "",
     listing.area ? `Area: ${listing.area}` : "",
     listing.pincode ? `Pincode: ${listing.pincode}` : "",
   ]
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
 
   const { data: listings, error } = await supabaseAdmin
     .from("listings")
-    .select("id,title,description,category,occasion,size,condition,rental_price_per_day,security_deposit,area,pincode")
+    .select("id,title,description,category,occasion,size,condition,rental_price_per_day,security_deposit,city,area,pincode")
     .eq("available", true)
     .limit(500);
 

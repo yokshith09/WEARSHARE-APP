@@ -1,6 +1,9 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const DEFAULT_MODEL = process.env.GEMINI_MODEL || "gemini-1.5-flash";
+const DEFAULT_MODEL =
+  process.env.GEMINI_MODEL && !process.env.GEMINI_MODEL.startsWith("gemini-1.5")
+    ? process.env.GEMINI_MODEL
+    : "gemini-2.5-flash";
 const EMBEDDING_MODEL = "text-embedding-004";
 
 function getGeminiClient() {

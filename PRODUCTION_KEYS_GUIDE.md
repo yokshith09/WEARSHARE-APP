@@ -33,6 +33,9 @@ Open [Google Cloud Console](https://console.cloud.google.com/) -> APIs & Service
 - `GOOGLE_ID`: OAuth client ID
 - `GOOGLE_SECRET`: OAuth client secret
 
+If Google login is currently failing, these are the first two values to add.
+Without them, the sign-in button can render but the provider cannot complete auth.
+
 ## 3) Razorpay
 
 Open [Razorpay Dashboard](https://dashboard.razorpay.com/) -> `Settings` -> `API Keys`.
@@ -111,6 +114,18 @@ Open Cloudflare Dashboard -> R2 -> bucket -> API Tokens / S3 API.
 - `INGEST_SECRET`: random secret for `/api/ingest`
 - `WEBHOOK_SECRET`: random secret for `/api/webhooks/listing`
 - `ALLOWED_ORIGINS`: comma-separated origins, e.g. `https://wearshare.qzz.io,http://localhost:3000`
+
+These are still missing in your current Vercel list and should be added before
+you depend on ingestion, webhooks, or origin checks in production.
+
+Recommended with your current domain:
+
+- `NEXTAUTH_URL=https://wearshare.qzz.io`
+- `ALLOWED_ORIGINS=https://wearshare.qzz.io,http://localhost:3000`
+
+Optional but useful:
+
+- `GEMINI_MODEL=gemini-2.5-flash` if you want to pin the working model explicitly
 
 ## 11) Deploy Checklist
 

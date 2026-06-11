@@ -10,8 +10,9 @@ function buildEmbeddableText(listing: Record<string, any>) {
     listing.occasion ? `Occasion: ${listing.occasion}` : "",
     listing.size ? `Size: ${listing.size}` : "",
     listing.condition ? `Condition: ${listing.condition}` : "",
-    `Rental price: ₹${Math.round(Number(listing.rentalPricePerDay || listing.rental_price_per_day || 0))} per day`,
-    `Security deposit: ₹${Math.round(Number(listing.securityDeposit || listing.security_deposit || 0))}`,
+    `Rental price: Rs ${Math.round(Number(listing.rentalPricePerDay || listing.rental_price_per_day || 0))} per day`,
+    `Security deposit: Rs ${Math.round(Number(listing.securityDeposit || listing.security_deposit || 0))}`,
+    listing.city ? `City: ${listing.city}` : "",
     listing.area ? `Area: ${listing.area}` : "",
     listing.pincode ? `Pincode: ${listing.pincode}` : "",
   ]
@@ -55,6 +56,7 @@ export async function POST(req: NextRequest) {
       condition: listing.condition || "good",
       rental_price_per_day: Number(listing.rentPerDay || listing.rentalPricePerDay || 0),
       security_deposit: Number(listing.depositAmount || listing.securityDeposit || 0),
+      city: listing.city || "Bengaluru",
       pincode: listing.pincode || null,
       area: listing.city || listing.area || "Bengaluru",
       available: listing.isAvailable !== false,
@@ -84,4 +86,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error?.message || "Webhook sync failed" }, { status: 500 });
   }
 }
-

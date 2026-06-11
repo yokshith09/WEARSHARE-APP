@@ -83,6 +83,7 @@ ALTER TABLE public.listings ADD COLUMN IF NOT EXISTS listing_type VARCHAR(50);
 ALTER TABLE public.listings ADD COLUMN IF NOT EXISTS security_deposit NUMERIC(10, 2) DEFAULT 0;
 ALTER TABLE public.listings ADD COLUMN IF NOT EXISTS image_url TEXT;
 ALTER TABLE public.listings ADD COLUMN IF NOT EXISTS photo_urls TEXT[] DEFAULT '{}';
+ALTER TABLE public.listings ADD COLUMN IF NOT EXISTS city VARCHAR(80);
 ALTER TABLE public.listings ADD COLUMN IF NOT EXISTS pincode VARCHAR(10);
 ALTER TABLE public.listings ADD COLUMN IF NOT EXISTS area VARCHAR(120);
 ALTER TABLE public.listings ADD COLUMN IF NOT EXISTS retail_price NUMERIC(10, 2);
@@ -211,6 +212,7 @@ CREATE TABLE IF NOT EXISTS public.security_events (
 
 CREATE INDEX IF NOT EXISTS idx_listings_available_created_at ON public.listings (available, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_listings_category_size_price ON public.listings (category, size, rental_price_per_day);
+CREATE INDEX IF NOT EXISTS idx_listings_city_pincode ON public.listings (city, pincode);
 CREATE INDEX IF NOT EXISTS idx_listings_pincode ON public.listings (pincode);
 CREATE INDEX IF NOT EXISTS idx_bookings_listing_dates ON public.bookings (listing_id, rental_start, rental_end);
 CREATE INDEX IF NOT EXISTS idx_bookings_renter ON public.bookings (renter_id, created_at DESC);

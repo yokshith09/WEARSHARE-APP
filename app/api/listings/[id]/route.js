@@ -56,6 +56,7 @@ export async function GET(request, { params }) {
       imageUrl: listing.image_url,
       photoUrls: listing.photo_urls || (listing.image_url ? [listing.image_url] : []),
       image: listing.image_url,
+      city: listing.city,
       pincode: listing.pincode,
       area: listing.area,
       retailPrice: listing.retail_price,

@@ -1,8 +1,8 @@
 "use client";
 
 import { Suspense } from "react";
-import { useEffect, useState, useMemo } from "react";
-import { SlidersHorizontal, MapPin, CalendarIcon, X, Mic, Search } from "lucide-react";
+import { useEffect, useRef, useState, useMemo } from "react";
+import { ChevronLeft, ChevronRight, SlidersHorizontal, MapPin, CalendarIcon, X, Mic, Search } from "lucide-react";
 import { format } from "date-fns";
 import { isDateBlocked } from "@/lib/listings";
 import { ListingCard } from "@/components/listing-card";
@@ -15,6 +15,7 @@ import { trackEvent } from "@/lib/analytics";
 const categories = ["All", "Lehenga", "Saree", "Sherwani", "Anarkali", "Gown", "Kurta", "Suit", "Indo-Western", "Blazer", "Tuxedo", "Co-ord Set", "Dhoti", "Accessories", "Shirt", "Pant"];
 const occasions = ["All", "Wedding", "Reception", "Sangeet", "Cocktail", "Festival"];
 const sizes = ["All", "XS", "S", "M", "L", "XL", "Free"];
+const cities = ["All", "Bengaluru", "Coimbatore"];
 const distances = [
   { label: "All", value: 999 },
   { label: "Under 2 km", value: 2 },
@@ -33,6 +34,8 @@ export default function Browse() {
 function BrowseContent() {
   const searchParams = useSearchParams();
   const initialCategory = searchParams.get("category");
+  const initialPincode = searchParams.get("pincode") || "";
+  const initialCity = searchParams.get("city") || "All";
   const categoryFromQuery =
     initialCategory === "men" ? "Sherwani" :
     initialCategory === "women" ? "Lehenga" :
@@ -40,16 +43,22 @@ function BrowseContent() {
     "All";
 
   const [cat, setCat] = useState(categoryFromQuery);
+  const [city, setCity] = useState(initialCity);
   const [occ, setOcc] = useState("All");
   const [size, setSize] = useState("All");
   const [maxKm, setMaxKm] = useState(999);
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [sort, setSort] = useState("Recommended");
   const [searchTerm, setSearchTerm] = useState("");
+  const [pincode, setPincode] = useState(initialPincode);
   const [listening, setListening] = useState(false);
   const [trustedOnly, setTrustedOnly] = useState(false);
   const [apiListings, setApiListings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const railRef = useRef<HTMLDivElement>(null);
+  const scrollRail = (direction: number) => {
+    railRef.current?.scrollBy({ left: direction, behavior: "smooth" });
+  };
 
   useEffect(() => {
     fetch('/api/listings')
@@ -68,13 +77,17 @@ function BrowseContent() {
           const isVerified = l.ownerId?.isVerified || l.verified;
           const listingCat = l.category || 'All';
           const listingOcc = l.occasion || 'All';
+          const listingCity = l.city || l.area || "Bengaluru";
+          const listingPincode = String(l.pincode || "");
           const distanceKm = l.distanceKm || 0;
           const text = `${l.title || l.name || ""} ${l.description || ""} ${listingCat} ${listingOcc}`.toLowerCase();
           return (cat === "All" || listingCat.toLowerCase() === cat.toLowerCase()) &&
+                 (city === "All" || listingCity.toLowerCase() === city.toLowerCase()) &&
                  (occ === "All" || listingOcc.toLowerCase() === occ.toLowerCase()) &&
                  (size === "All" || l.size === size) &&
                  distanceKm <= maxKm &&
                  (!trustedOnly || isVerified) &&
+                 (!pincode || listingPincode.includes(pincode.replace(/\D/g, ""))) &&
                  (!searchTerm || text.includes(searchTerm.toLowerCase())) &&
                  (!date || !isDateBlocked(l, date));
         }
@@ -93,12 +106,12 @@ function BrowseContent() {
         if (sort === "Top rated") return bRating - aRating;
         return Number(bVerified) - Number(aVerified) || bRating - aRating;
       }),
-    [apiListings, cat, occ, size, maxKm, date, sort, trustedOnly, searchTerm],
+    [apiListings, cat, city, occ, size, maxKm, date, sort, trustedOnly, searchTerm, pincode],
   );
 
   useEffect(() => {
     if (loading) return;
-    const filters = { cat, occ, size, maxKm, trustedOnly, date: date?.toISOString(), searchTerm };
+    const filters = { cat, city, occ, size, maxKm, trustedOnly, date: date?.toISOString(), searchTerm, pincode };
     trackEvent("filter_changed", filters);
     if (apiListings.length > 0 && filtered.length === 0) {
       trackEvent("zero_results", filters);
@@ -108,15 +121,17 @@ function BrowseContent() {
   const activeCount = [
     searchTerm,
     cat !== "All",
+    city !== "All",
     occ !== "All",
     size !== "All",
     maxKm !== 999,
     trustedOnly,
     !!date,
+    pincode,
   ].filter(Boolean).length;
 
   const clearAll = () => {
-    setSearchTerm(""); setCat("All"); setOcc("All"); setSize("All"); setMaxKm(999); setDate(undefined); setSort("Recommended"); setTrustedOnly(false);
+    setSearchTerm(""); setPincode(""); setCat("All"); setCity("All"); setOcc("All"); setSize("All"); setMaxKm(999); setDate(undefined); setSort("Recommended"); setTrustedOnly(false);
   };
 
   const startVoiceSearch = () => {
@@ -144,7 +159,9 @@ function BrowseContent() {
   return (
     <div className="bg-background">
       <section className="container-edit pt-12 md:pt-16 pb-10 border-b border-border">
-        <p className="eyebrow flex items-center gap-2"><MapPin className="h-3 w-3" /> Bengaluru / 560038 / 5 km radius</p>
+        <p className="eyebrow flex items-center gap-2">
+          <MapPin className="h-3 w-3" /> Bengaluru + Coimbatore / pincode search / 5 km radius
+        </p>
         <h1 className="font-display text-4xl md:text-6xl mt-4 text-ink leading-[1.05]">
           {filtered.length} outfits<br />
           <span className="italic text-primary">within walking distance.</span>
@@ -152,80 +169,124 @@ function BrowseContent() {
       </section>
 
       <section className="container-edit sticky top-16 z-30 border-b border-border bg-background/92 py-4 backdrop-blur md:top-20">
-        <div className="flex items-center gap-4 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <div className="flex items-center gap-1 shrink-0 text-xs text-muted-foreground pr-3 border-r border-border">
-            <SlidersHorizontal className="h-3.5 w-3.5" />
-            <span>Filters{activeCount > 0 && ` (${activeCount})`}</span>
-          </div>
-          <div className="shrink-0 flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5">
-            <Search className="h-3.5 w-3.5 text-muted-foreground" />
-            <input
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="Search outfits"
-              className="w-36 bg-transparent text-xs outline-none"
-            />
-            <button
-              type="button"
-              aria-label="Voice search"
-              onClick={startVoiceSearch}
-              className={`rounded p-1 ${listening ? "bg-primary text-white" : "text-muted-foreground hover:text-ink"}`}
-            >
-              <Mic className="h-3.5 w-3.5" />
-            </button>
-          </div>
-          <FilterRow label="Occasion" value={occ} setValue={setOcc} options={occasions} />
-          <FilterRow label="Category" value={cat} setValue={setCat} options={categories} />
-          <FilterRow label="Size" value={size} setValue={setSize} options={sizes} />
-          <FilterRow
-            label="Distance"
-            value={distances.find((d) => d.value === maxKm)?.label ?? "All"}
-            setValue={(v) => setMaxKm(distances.find((d) => d.label === v)?.value ?? 999)}
-            options={distances.map((d) => d.label)}
-          />
-          <FilterRow label="Sort" value={sort} setValue={setSort} options={["Recommended", "Nearest", "Price low", "Top rated"]} />
-
+        <div className="flex items-stretch gap-2">
           <button
-            onClick={() => setTrustedOnly(!trustedOnly)}
-            className={cn(
-              "shrink-0 inline-flex items-center gap-1.5 text-xs px-3 py-1.5 border transition-colors",
-              trustedOnly ? "bg-primary text-white border-primary" : "border-border text-ink hover:border-ink"
-            )}
+            type="button"
+            onClick={() => scrollRail(-340)}
+            aria-label="Scroll filters left"
+            className="inline-flex shrink-0 items-center justify-center border border-border bg-background px-2 text-ink hover:border-ink"
           >
-            Trusted Only
+            <ChevronLeft className="h-4 w-4" />
           </button>
 
-          <Popover>
-            <PopoverTrigger asChild>
-              <button
-                className={cn(
-                  "shrink-0 inline-flex items-center gap-1.5 text-xs px-3 py-1.5 border transition-colors",
-                  date ? "bg-ink text-cream border-ink" : "border-border text-ink hover:border-ink",
-                )}
-              >
-                <CalendarIcon className="h-3.5 w-3.5" />
-                {date ? format(date, "d MMM") : "Available on"}
-              </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={date}
-                onSelect={setDate}
-                disabled={(d) => d < new Date(new Date().setHours(0,0,0,0))}
-                className="p-3 pointer-events-auto"
+          <div
+            ref={railRef}
+            className="flex min-w-0 flex-1 items-center gap-4 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            <div className="flex items-center gap-1 shrink-0 text-xs text-muted-foreground pr-3 border-r border-border">
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+              <span>Filters{activeCount > 0 && ` (${activeCount})`}</span>
+            </div>
+            <div className="shrink-0 flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5">
+              <Search className="h-3.5 w-3.5 text-muted-foreground" />
+              <input
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="Search outfits"
+                className="w-36 bg-transparent text-xs outline-none"
               />
-            </PopoverContent>
-          </Popover>
-
-          {activeCount > 0 && (
+              <button
+                type="button"
+                aria-label="Voice search"
+                onClick={startVoiceSearch}
+                className={`rounded p-1 ${listening ? "bg-primary text-white" : "text-muted-foreground hover:text-ink"}`}
+              >
+                <Mic className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <div className="shrink-0">
+              <FilterRow label="City" value={city} setValue={setCity} options={cities} />
+            </div>
+            <div className="shrink-0">
+              <FilterRow label="Occasion" value={occ} setValue={setOcc} options={occasions} />
+            </div>
+            <div className="shrink-0">
+              <FilterRow label="Category" value={cat} setValue={setCat} options={categories} />
+            </div>
+            <div className="shrink-0">
+              <FilterRow label="Size" value={size} setValue={setSize} options={sizes} />
+            </div>
+            <div className="shrink-0">
+              <FilterRow
+                label="Distance"
+                value={distances.find((d) => d.value === maxKm)?.label ?? "All"}
+                setValue={(v) => setMaxKm(distances.find((d) => d.label === v)?.value ?? 999)}
+                options={distances.map((d) => d.label)}
+              />
+            </div>
+            <div className="shrink-0">
+              <FilterRow label="Sort" value={sort} setValue={setSort} options={["Recommended", "Nearest", "Price low", "Top rated"]} />
+            </div>
             <button
-              onClick={clearAll}
-              className="shrink-0 inline-flex items-center gap-1 text-xs text-primary hover:underline"
+              onClick={() => setTrustedOnly(!trustedOnly)}
+              className={cn(
+                "shrink-0 inline-flex items-center gap-1.5 text-xs px-3 py-1.5 border transition-colors",
+                trustedOnly ? "bg-primary text-white border-primary" : "border-border text-ink hover:border-ink"
+              )}
             >
-              <X className="h-3 w-3" /> Clear all
+              Trusted Only
             </button>
-          )}
+            <div className="shrink-0 flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5">
+              <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+              <input
+                value={pincode}
+                onChange={(event) => setPincode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="Pincode"
+                inputMode="numeric"
+                maxLength={6}
+                className="w-24 bg-transparent text-xs outline-none"
+              />
+            </div>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  className={cn(
+                    "shrink-0 inline-flex items-center gap-1.5 text-xs px-3 py-1.5 border transition-colors",
+                    date ? "bg-ink text-cream border-ink" : "border-border text-ink hover:border-ink",
+                  )}
+                >
+                  <CalendarIcon className="h-3.5 w-3.5" />
+                  {date ? format(date, "d MMM") : "Available on"}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={date}
+                  onSelect={setDate}
+                  disabled={(d) => d < new Date(new Date().setHours(0,0,0,0))}
+                  className="p-3 pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
+            {activeCount > 0 && (
+              <button
+                onClick={clearAll}
+                className="shrink-0 inline-flex items-center gap-1 text-xs text-primary hover:underline"
+              >
+                <X className="h-3 w-3" /> Clear all
+              </button>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => scrollRail(340)}
+            aria-label="Scroll filters right"
+            className="inline-flex shrink-0 items-center justify-center border border-border bg-background px-2 text-ink hover:border-ink"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
         </div>
       </section>
 
