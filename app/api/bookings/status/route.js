@@ -7,10 +7,15 @@ import { getRequestContext, recordSecurityEvent } from '@/lib/security-events'
 
 const BOOKING_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const STATUS_TRANSITIONS = {
-  pending: new Set(['active', 'declined']),
-  confirmed: new Set(['active', 'declined']),
-  active: new Set(['completed', 'maintenance']),
-  maintenance: new Set(['completed']),
+  requested: new Set(['approved', 'declined']),
+  pending: new Set(['approved', 'active', 'declined']),
+  confirmed: new Set(['approved', 'active', 'declined']),
+  approved: new Set(['picked_up', 'declined']),
+  active: new Set(['picked_up', 'completed', 'maintenance']),
+  picked_up: new Set(['returned', 'maintenance']),
+  returned: new Set([]),
+  completed: new Set([]),
+  maintenance: new Set(['returned', 'completed']),
 }
 
 function optionalText(value, maxLength) {
@@ -184,6 +189,8 @@ export async function PUT(request) {
       }
 
       update.status = deliveryStatus
+      if (deliveryStatus === 'picked_up') update.fulfillment_status = 'picked_up'
+      if (deliveryStatus === 'returned') update.fulfillment_status = 'returned'
     }
 
     const normalizedPickupLocation = optionalText(pickupLocation, 500)
@@ -213,7 +220,7 @@ export async function PUT(request) {
 
     if (updateError) throw updateError
 
-    if (deliveryStatus === 'completed' || deliveryStatus === 'declined') {
+    if (deliveryStatus === 'returned' || deliveryStatus === 'completed' || deliveryStatus === 'declined') {
       const { error: listingError } = await supabaseAdmin
         .from('listings')
         .update({ available: true })

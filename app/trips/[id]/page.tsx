@@ -1,12 +1,12 @@
 "use client";
 import Link from "next/link";
-import { useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import {
   ArrowLeft, MapPin, MessageCircle, Send, Camera, Check, Clock, Package, Truck, RotateCcw,
   ShieldCheck, Phone, Paperclip, Image as ImageIcon, AlertTriangle, X, Plus, Wallet,
 } from "lucide-react";
 import { getListing, inr } from "@/lib/listings";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 
 type Stage = "requested" | "approved" | "picked_up" | "returned";
 
@@ -38,11 +38,15 @@ const RETURN_CHECKLIST = [
 
 export default function TripPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const id = params.id as string;
-  const listing = useMemo(() => getListing(id), [id]);
+  const role = searchParams.get("role") === "lister" ? "lister" : "renter";
+  const fallbackListing = useMemo(() => getListing(id), [id]);
+  const [bookingListing, setBookingListing] = useState<any>(null);
+  const listing = bookingListing || fallbackListing;
 
   const [current, setCurrent] = useState<Stage>("approved");
-  const [pickupConfirmedBy, setPickupConfirmedBy] = useState<{ me: boolean; lister: boolean }>({ me: false, lister: true });
+  const [pickupConfirmedBy, setPickupConfirmedBy] = useState<{ me: boolean; lister: boolean }>({ me: false, lister: false });
   const [returnConfirmedBy, setReturnConfirmedBy] = useState<{ me: boolean; lister: boolean }>({ me: false, lister: false });
   const [pickupPhotos, setPickupPhotos] = useState<string[]>([]);
   const [returnPhotos, setReturnPhotos] = useState<string[]>([]);
@@ -60,6 +64,46 @@ export default function TripPage() {
   const [draft, setDraft] = useState("");
   const [actionsOpen, setActionsOpen] = useState(false);
   const chatPhotoRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (fallbackListing) return;
+    fetch("/api/bookings")
+      .then((res) => res.json())
+      .then((data) => {
+        const booking = [...(data.rentals || []), ...(data.lending || [])].find((item: any) => item.id === id);
+        if (!booking) return;
+        setCurrent((booking.status || "approved") as Stage);
+        setBookingListing({
+          id: booking.listingId || booking.id,
+          title: booking.listingName,
+          lister: role === "lister" ? "Your renter" : "Lister",
+          area: booking.pickupLocation || "Shared pickup point",
+          city: "WearShare",
+          pricePerDay: Math.round(Number(booking.rentalPrice || 0) / Math.max(Number(booking.days || 1), 1)),
+          deposit: Number(booking.securityDeposit || 0),
+          image: booking.listingImage || "/placeholder.jpg",
+        });
+      })
+      .catch(() => {});
+  }, [fallbackListing, id, role]);
+
+  useEffect(() => {
+    if (!listing) return;
+    setMessages([
+      { id: "m1", from: "lister", kind: "text", time: "10:24 AM", text: `Hi! Booking confirmed. Pickup is at my place in ${listing.area || ""} - anytime between 6-9pm Friday works.` },
+      {
+        id: "m2",
+        from: "lister",
+        kind: "address",
+        time: "10:24 AM",
+        title: "Pickup address",
+        address: `2nd Floor, 12th Main, ${listing.area || ""}, ${listing.city || ""} 560038`,
+        window: "Friday / 6:00 - 9:00 PM",
+      },
+      { id: "m3", from: "me", kind: "text", time: "10:31 AM", text: "Perfect, I'll come around 7pm. Should I bring an ID?" },
+      { id: "m4", from: "lister", kind: "text", time: "10:33 AM", text: "Yes please, just for verification at handover. I'll have it steam-pressed and bagged." },
+    ]);
+  }, [listing]);
 
   if (!listing) return <div className="p-20 text-center">Not found</div>;
 
@@ -97,12 +141,18 @@ export default function TripPage() {
   const bothReturnConfirmed = returnConfirmedBy.me && returnConfirmedBy.lister;
 
   const onPickupConfirm = () => {
-    setPickupConfirmedBy((p) => ({ ...p, me: true }));
-    if (pickupConfirmedBy.lister) setCurrent("picked_up");
+    const next = role === "lister"
+      ? { ...pickupConfirmedBy, lister: true }
+      : { ...pickupConfirmedBy, me: true };
+    setPickupConfirmedBy(next);
+    if (next.me && next.lister) setCurrent("picked_up");
   };
   const onReturnConfirm = () => {
-    setReturnConfirmedBy((r) => ({ ...r, me: true }));
-    if (returnConfirmedBy.lister) setCurrent("returned");
+    const next = role === "lister"
+      ? { ...returnConfirmedBy, lister: true }
+      : { ...returnConfirmedBy, me: true };
+    setReturnConfirmedBy(next);
+    if (next.me && next.lister) setCurrent("returned");
   };
   const releaseDeposit = () => setDepositReleased(true);
 
@@ -117,7 +167,7 @@ export default function TripPage() {
       <section className="container-edit pt-6 pb-20">
         <div className="flex items-end justify-between gap-4 flex-wrap">
           <div>
-            <p className="eyebrow">Trip / #WS-{listing.id.slice(0, 6).toUpperCase()}</p>
+            <p className="eyebrow">Trip / #WS-{String(listing.id).slice(0, 6).toUpperCase()} / {role}</p>
             <h1 className="font-display text-4xl md:text-5xl mt-3 text-ink leading-tight">{listing.title}</h1>
             <p className="mt-2 text-sm text-muted-foreground">with {listing.lister} / {listing.area}, {listing.city}</p>
           </div>
@@ -173,10 +223,10 @@ export default function TripPage() {
                 emptyHint="Add 4 handover photos before confirming."
               />
               <DualConfirm
-                meDone={pickupConfirmedBy.me}
-                listerDone={pickupConfirmedBy.lister}
+                meDone={role === "lister" ? pickupConfirmedBy.lister : pickupConfirmedBy.me}
+                listerDone={role === "lister" ? pickupConfirmedBy.me : pickupConfirmedBy.lister}
                 onMe={onPickupConfirm}
-                meLabel="Confirm pickup"
+                meLabel={role === "lister" ? "Confirm lister pickup" : "Confirm pickup"}
                 disabled={pickupPhotos.length < 1 || current === "returned"}
               />
               {bothPickupConfirmed && current !== "returned" && (
@@ -200,10 +250,10 @@ export default function TripPage() {
                 emptyHint="Optional - photograph the returned outfit."
               />
               <DualConfirm
-                meDone={returnConfirmedBy.me}
-                listerDone={returnConfirmedBy.lister}
+                meDone={role === "lister" ? returnConfirmedBy.lister : returnConfirmedBy.me}
+                listerDone={role === "lister" ? returnConfirmedBy.me : returnConfirmedBy.lister}
                 onMe={onReturnConfirm}
-                meLabel="Confirm return"
+                meLabel={role === "lister" ? "Confirm item received" : "Confirm return"}
                 disabled={!bothPickupConfirmed}
               />
               <div className={`mt-4 border ${bothReturnConfirmed ? "border-primary bg-primary/5" : "border-border bg-secondary/30"} p-4 flex items-start gap-3`}>

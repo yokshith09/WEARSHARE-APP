@@ -1,12 +1,29 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
-import { ShoppingBag, Ruler, History, Heart, ArrowRight } from "lucide-react";
+import { Check, Clock, Heart, History, Package, RotateCcw, Ruler, ShoppingBag } from "lucide-react";
+
+const statusSteps = [
+  { id: "requested", label: "Requested", icon: Clock },
+  { id: "approved", label: "Approved", icon: Check },
+  { id: "picked_up", label: "Picked up", icon: Package },
+  { id: "returned", label: "Returned", icon: RotateCcw },
+];
+
+const statusRank: Record<string, number> = {
+  requested: 0,
+  approved: 1,
+  picked_up: 2,
+  returned: 3,
+};
+
+const inr = (value: number) => `Rs ${Math.round(Number(value || 0)).toLocaleString("en-IN")}`;
 
 export default function RenterDashboard() {
   const [activeTab, setActiveTab] = useState<"orders" | "wishlist" | "measurements">("orders");
-  const [data, setData] = useState({ rentals: [] });
+  const [data, setData] = useState<{ rentals?: any[] }>({ rentals: [] });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -25,95 +42,66 @@ export default function RenterDashboard() {
 
   return (
     <div className="space-y-8">
-      {/* Renter Sub-Navigation */}
-      <div className="flex gap-4">
-        <button
-          onClick={() => setActiveTab("orders")}
-          className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-            activeTab === "orders" ? "bg-primary text-white" : "bg-secondary text-ink hover:bg-secondary/80"
-          }`}
-        >
-          <History className="h-4 w-4 inline-block mr-2" />
-          Orders & Returns
-        </button>
-        <button
-          onClick={() => setActiveTab("wishlist")}
-          className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-            activeTab === "wishlist" ? "bg-primary text-white" : "bg-secondary text-ink hover:bg-secondary/80"
-          }`}
-        >
-          <Heart className="h-4 w-4 inline-block mr-2" />
+      <div className="flex gap-3 overflow-x-auto pb-2">
+        <TabButton active={activeTab === "orders"} onClick={() => setActiveTab("orders")} icon={History}>
+          Orders & returns
+        </TabButton>
+        <TabButton active={activeTab === "wishlist"} onClick={() => setActiveTab("wishlist")} icon={Heart}>
           Wishlist
-        </button>
-        <button
-          onClick={() => setActiveTab("measurements")}
-          className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-            activeTab === "measurements" ? "bg-primary text-white" : "bg-secondary text-ink hover:bg-secondary/80"
-          }`}
-        >
-          <Ruler className="h-4 w-4 inline-block mr-2" />
+        </TabButton>
+        <TabButton active={activeTab === "measurements"} onClick={() => setActiveTab("measurements")} icon={Ruler}>
           Measurements
-        </button>
+        </TabButton>
       </div>
 
       {activeTab === "orders" && (
         <div className="space-y-6">
-          <h2 className="font-display text-2xl">Your Orders</h2>
+          <h2 className="font-display text-2xl">Your bookings</h2>
           {(!data?.rentals || data.rentals.length === 0) ? (
-            <div className="border border-border border-dashed rounded-xl p-12 text-center bg-secondary/30">
-              <ShoppingBag className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
+            <div className="border border-border border-dashed bg-secondary/30 p-12 text-center">
+              <ShoppingBag className="mx-auto mb-4 h-10 w-10 text-muted-foreground" />
               <p className="font-medium text-ink">No rentals yet</p>
-              <p className="text-sm text-muted-foreground mt-1 mb-6">You haven't rented any outfits yet.</p>
-              <Link href="/browse" className="btn-primary">Browse Outfits</Link>
+              <p className="mb-6 mt-1 text-sm text-muted-foreground">Find an outfit and confirm your first rental.</p>
+              <Link href="/browse" className="btn-primary">Browse outfits</Link>
             </div>
           ) : (
             <div className="space-y-4">
-              {(data?.rentals || []).map((booking: any) => (
-                <div key={booking.id} className="border border-border rounded-xl p-5 bg-card flex flex-col sm:flex-row gap-6 items-start sm:items-center">
-                  <div className="h-24 w-20 bg-muted rounded-md overflow-hidden shrink-0">
-                    <img src={booking.listingImage || "/placeholder.jpg"} alt={booking.listingName} className="h-full w-full object-cover" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-medium text-ink text-lg">{booking.listingName}</h3>
-                        <p className="text-sm text-muted-foreground mt-1">Rental Period: {booking.rentalStart} to {booking.rentalEnd}</p>
+              {(data?.rentals || []).map((booking) => (
+                <div key={booking.id} className="border border-border bg-card p-5">
+                  <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+                    <img
+                      src={booking.listingImage || "/placeholder.jpg"}
+                      alt={booking.listingName}
+                      className="h-24 w-20 shrink-0 bg-muted object-cover"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <h3 className="text-lg font-medium text-ink">{booking.listingName}</h3>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            {booking.rentalStart} to {booking.rentalEnd}
+                          </p>
+                        </div>
+                        <span className="bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-widest text-primary">
+                          {booking.status}
+                        </span>
                       </div>
-                      <span className="text-xs uppercase tracking-widest font-bold text-primary bg-primary/10 px-3 py-1 rounded-full">
-                        {booking.status}
-                      </span>
-                    </div>
-                    
-                    {/* Timeline visualization */}
-                    <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground border-t border-border pt-4">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                        <span>Ordered</span>
-                      </div>
-                      <div className="flex-1 h-px bg-border mx-2"></div>
-                      <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${booking.status === 'active' || booking.status === 'completed' ? 'bg-green-500' : 'bg-muted'}`}></div>
-                        <span>Received</span>
-                      </div>
-                      <div className="flex-1 h-px bg-border mx-2"></div>
-                      <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${booking.status === 'completed' ? 'bg-green-500' : 'bg-muted'}`}></div>
-                        <span>Returned</span>
+                      <div className="mt-4 border-t border-border pt-4">
+                        <BookingTimeline status={booking.status} />
+                        <p className="mt-3 text-xs text-muted-foreground">
+                          Deposit held: {inr(booking.securityDeposit)} / Handover photos and return confirmation are tracked in logistics.
+                        </p>
                       </div>
                     </div>
-                  </div>
-                  <div className="shrink-0 text-right w-full sm:w-auto flex flex-row sm:flex-col justify-between items-center sm:items-end gap-3 mt-4 sm:mt-0 pt-4 sm:pt-0 border-t sm:border-t-0 border-border">
-                    <div className="font-semibold text-lg">₹{booking.totalAmount}</div>
-                    {booking.status === 'active' && (
-                      <button className="text-xs font-medium text-red-500 border border-red-200 hover:bg-red-50 px-3 py-1.5 rounded-md transition-colors">
-                        Initiate Return
-                      </button>
-                    )}
-                    {booking.status === 'pending' && (
-                      <Link href={`/checkout/confirm?order_id=${booking.order_id}`} className="text-xs font-medium bg-primary text-white px-3 py-1.5 rounded-md hover:bg-primary/90 transition-colors">
-                        Complete Payment
+                    <div className="flex shrink-0 flex-row items-center justify-between gap-3 border-t border-border pt-4 sm:flex-col sm:items-end sm:border-t-0 sm:pt-0">
+                      <p className="text-lg font-semibold text-ink">{inr(booking.totalAmount)}</p>
+                      <Link
+                        href={`/trips/${booking.id}?role=renter`}
+                        className="bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary/90"
+                      >
+                        Open logistics
                       </Link>
-                    )}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -124,47 +112,69 @@ export default function RenterDashboard() {
 
       {activeTab === "wishlist" && (
         <div className="space-y-6">
-          <h2 className="font-display text-2xl">Your Wishlist</h2>
-          <div className="border border-border border-dashed rounded-xl p-12 text-center bg-secondary/30">
-            <Heart className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
-            <p className="font-medium text-ink">Coming Soon</p>
-            <p className="text-sm text-muted-foreground mt-1">We are building your wishlist.</p>
+          <h2 className="font-display text-2xl">Your wishlist</h2>
+          <div className="border border-border border-dashed bg-secondary/30 p-12 text-center">
+            <Heart className="mx-auto mb-4 h-10 w-10 text-muted-foreground" />
+            <p className="font-medium text-ink">Coming soon</p>
+            <p className="mt-1 text-sm text-muted-foreground">Saved outfits will appear here.</p>
           </div>
         </div>
       )}
 
       {activeTab === "measurements" && (
         <div className="space-y-6">
-          <div className="flex justify-between items-center">
-            <h2 className="font-display text-2xl">Smart Sizing Profile</h2>
-            <span className="bg-gradient-to-r from-primary to-purple-500 text-white text-xs px-3 py-1 rounded-full font-medium flex items-center">
-              ✨ AI Match Enabled
-            </span>
+          <div className="flex items-center justify-between">
+            <h2 className="font-display text-2xl">Smart sizing profile</h2>
+            <span className="bg-primary px-3 py-1 text-xs font-medium text-white">AI match enabled</span>
           </div>
-          <div className="bg-card border border-border p-6 rounded-xl">
-            <p className="text-sm text-muted-foreground mb-6">Enter your measurements to get AI-powered fit predictions on all outfits.</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Height (cm)</label>
-                <input type="number" className="w-full border border-border rounded-md px-3 py-2 text-sm bg-background" placeholder="e.g. 175" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Chest (cm)</label>
-                <input type="number" className="w-full border border-border rounded-md px-3 py-2 text-sm bg-background" placeholder="e.g. 96" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Waist (cm)</label>
-                <input type="number" className="w-full border border-border rounded-md px-3 py-2 text-sm bg-background" placeholder="e.g. 81" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Hips (cm)</label>
-                <input type="number" className="w-full border border-border rounded-md px-3 py-2 text-sm bg-background" placeholder="e.g. 98" />
-              </div>
+          <div className="border border-border bg-card p-6">
+            <p className="mb-6 text-sm text-muted-foreground">Enter measurements to improve fit predictions on outfits.</p>
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              {["Height (cm)", "Chest (cm)", "Waist (cm)", "Hips (cm)"].map((label) => (
+                <div key={label} className="space-y-2">
+                  <label className="text-sm font-medium">{label}</label>
+                  <input type="number" className="w-full border border-border bg-background px-3 py-2 text-sm" />
+                </div>
+              ))}
             </div>
-            <button className="mt-6 btn-primary w-full md:w-auto">Save Measurements</button>
+            <button className="btn-primary mt-6 w-full md:w-auto">Save measurements</button>
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function TabButton({ active, onClick, icon: Icon, children }: { active: boolean; onClick: () => void; icon: any; children: ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`shrink-0 px-4 py-2 text-sm font-medium transition-colors ${
+        active ? "bg-primary text-white" : "bg-secondary text-ink hover:bg-secondary/80"
+      }`}
+    >
+      <Icon className="mr-2 inline-block h-4 w-4" />
+      {children}
+    </button>
+  );
+}
+
+function BookingTimeline({ status }: { status: string }) {
+  const current = statusRank[status] ?? 0;
+  return (
+    <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
+      {statusSteps.map((step, index) => {
+        const Icon = step.icon;
+        const done = index <= current;
+        return (
+          <div key={step.id} className="flex items-center gap-2">
+            <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${done ? "bg-primary text-white" : "bg-muted text-muted-foreground"}`}>
+              <Icon className="h-3 w-3" />
+            </span>
+            <span className={done ? "text-ink" : "text-muted-foreground"}>{step.label}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }

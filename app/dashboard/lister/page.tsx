@@ -1,26 +1,78 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
-import { Tag, TrendingUp, Inbox, AlertCircle, Plus, Edit2, Archive } from "lucide-react";
+import {
+  Archive,
+  CalendarClock,
+  Check,
+  Clock,
+  History,
+  Inbox,
+  Plus,
+  RefreshCcw,
+  Tag,
+  TrendingUp,
+  Wallet,
+} from "lucide-react";
 import dynamic from "next/dynamic";
+
 const EarningsChart = dynamic(() => import("@/components/earnings-chart"), { ssr: false });
 
-const earningsData = [
-  { name: 'Jan', earnings: 0 },
-  { name: 'Feb', earnings: 0 },
-  { name: 'Mar', earnings: 0 },
-  { name: 'Apr', earnings: 0 },
-  { name: 'May', earnings: 4500 },
-  { name: 'Jun', earnings: 12000 },
-];
+const statusLabels: Record<string, string> = {
+  requested: "Requested",
+  approved: "Approved",
+  picked_up: "Picked up",
+  returned: "Returned",
+  declined: "Declined",
+  maintenance: "Maintenance",
+};
+
+const inr = (value: number) => `Rs ${Math.round(Number(value || 0)).toLocaleString("en-IN")}`;
 
 export default function ListerDashboard() {
   const [activeTab, setActiveTab] = useState<"inventory" | "earnings" | "requests">("inventory");
-  const [data, setData] = useState({ lending: [] });
+  const [data, setData] = useState<{ lending?: any[] }>({ lending: [] });
   const [listings, setListings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editingBooking, setEditingBooking] = useState<any>(null);
+
+  const refresh = () => {
+    setLoading(true);
+    Promise.all([
+      fetch("/api/bookings").then((res) => res.json()),
+      fetch("/api/listings?mine=1").then((res) => res.json()),
+    ])
+      .then(([bookingData, listingData]) => {
+        setData(bookingData);
+        setListings(Array.isArray(listingData) ? listingData : []);
+      })
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    refresh();
+  }, []);
+
+  const lending = data?.lending || [];
+  const pendingRequests = lending.filter((b) => b.status === "requested");
+  const activeRentals = lending.filter((b) => ["approved", "picked_up"].includes(b.status));
+  const rentalHistory = lending.filter((b) => ["returned", "declined", "maintenance"].includes(b.status));
+  const totalEarnings = lending.reduce((sum, b) => sum + Number(b.listerEarnings || 0), 0);
+  const pendingPayout = lending
+    .filter((b) => b.status === "returned" && b.paymentStatus === "paid")
+    .reduce((sum, b) => sum + Number(b.listerEarnings || 0), 0);
+  const upcomingPayout = lending
+    .filter((b) => ["approved", "picked_up"].includes(b.status))
+    .reduce((sum, b) => sum + Number(b.listerEarnings || 0), 0);
+
+  const earningsData = useMemo(() => {
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];
+    return months.map((name, index) => ({
+      name,
+      earnings: index === months.length - 1 ? totalEarnings : Math.round(totalEarnings * (index / 10)),
+    }));
+  }, [totalEarnings]);
 
   const handleStatusChange = async (bookingId: string, newStatus: string) => {
     try {
@@ -30,40 +82,12 @@ export default function ListerDashboard() {
         body: JSON.stringify({ bookingId, deliveryStatus: newStatus }),
       });
       const result = await res.json();
-      if (!res.ok) {
-        throw new Error(result.error || "Unable to update booking");
-      }
-
-      setData((prev: any) => ({
-        ...prev,
-        lending: prev.lending.map((b: any) =>
-          b.id === bookingId ? { ...b, status: newStatus } : b
-        ),
-      }));
+      if (!res.ok) throw new Error(result.error || "Unable to update booking");
+      refresh();
     } catch (err) {
-      console.error("Failed to update status", err);
       alert(err instanceof Error ? err.message : "Unable to update booking");
     }
   };
-
-  const pendingRequests = (data?.lending || []).filter(
-    (b: any) => b.status === 'pending' || b.status === 'confirmed'
-  );
-  const inventoryRentals = (data?.lending || []).filter(
-    (b: any) => b.status !== 'pending' && b.status !== 'confirmed'
-  );
-
-  useEffect(() => {
-    Promise.all([
-      fetch("/api/bookings").then((res) => res.json()),
-      fetch("/api/listings?mine=1").then((res) => res.json()),
-    ])
-      .then(([resData, listingData]) => {
-        setData(resData);
-        setListings(Array.isArray(listingData) ? listingData : []);
-      })
-      .finally(() => setLoading(false));
-  }, []);
 
   if (loading) {
     return <div className="py-12 text-center text-muted-foreground">Loading your dashboard...</div>;
@@ -71,191 +95,239 @@ export default function ListerDashboard() {
 
   return (
     <div className="space-y-8">
-      {/* Lister Sub-Navigation */}
-      <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
-        <button
-          onClick={() => setActiveTab("inventory")}
-          className={`shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-            activeTab === "inventory" ? "bg-primary text-white" : "bg-secondary text-ink hover:bg-secondary/80"
-          }`}
-        >
-          <Tag className="h-4 w-4 inline-block mr-2" />
-          Inventory Manager
-        </button>
-        <button
-          onClick={() => setActiveTab("earnings")}
-          className={`shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-            activeTab === "earnings" ? "bg-primary text-white" : "bg-secondary text-ink hover:bg-secondary/80"
-          }`}
-        >
-          <TrendingUp className="h-4 w-4 inline-block mr-2" />
-          Earnings & Payouts
-        </button>
-        <button
-          onClick={() => setActiveTab("requests")}
-          className={`shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-            activeTab === "requests" ? "bg-primary text-white" : "bg-secondary text-ink hover:bg-secondary/80"
-          }`}
-        >
-          <Inbox className="h-4 w-4 inline-block mr-2" />
-          Rental Requests
-        </button>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Metric title="Listed items" value={String(listings.length)} icon={Tag} />
+        <Metric title="Active rentals" value={String(activeRentals.length)} icon={CalendarClock} />
+        <Metric title="Pending payout" value={inr(pendingPayout)} icon={Wallet} />
+        <Metric title="Lifetime earnings" value={inr(totalEarnings)} icon={TrendingUp} />
+      </div>
+
+      <div className="flex gap-3 overflow-x-auto pb-2">
+        <TabButton active={activeTab === "inventory"} onClick={() => setActiveTab("inventory")} icon={Tag}>
+          Inventory
+        </TabButton>
+        <TabButton active={activeTab === "earnings"} onClick={() => setActiveTab("earnings")} icon={Wallet}>
+          Earnings & payouts
+        </TabButton>
+        <TabButton active={activeTab === "requests"} onClick={() => setActiveTab("requests")} icon={Inbox}>
+          Rental requests
+        </TabButton>
       </div>
 
       {activeTab === "inventory" && (
         <div className="space-y-6">
-          <div className="flex justify-between items-center">
-            <h2 className="font-display text-2xl">Inventory Management</h2>
-            <Link href="/list-item" className="btn-primary flex items-center gap-2 h-10">
-              <Plus className="h-4 w-4" /> Add Listing
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="font-display text-2xl">Inventory</h2>
+            <Link href="/list-item" className="btn-primary inline-flex h-10 items-center gap-2">
+              <Plus className="h-4 w-4" /> Add listing
             </Link>
           </div>
-          
-          <div className="bg-card border border-border rounded-xl overflow-hidden">
-            <div className="p-4 border-b border-border flex gap-2">
-              <select className="text-sm bg-secondary border-none rounded-md px-3 py-1.5 focus:ring-0">
-                <option>All Statuses</option>
-                <option>Active</option>
-                <option>Rented</option>
-                <option>Maintenance</option>
-              </select>
-            </div>
-            
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-secondary/50 text-muted-foreground">
-                  <tr>
-                    <th className="px-6 py-4 font-medium">Item</th>
-                    <th className="px-6 py-4 font-medium">Price/Day</th>
-                    <th className="px-6 py-4 font-medium">Status</th>
-                    <th className="px-6 py-4 font-medium">Earnings</th>
-                    <th className="px-6 py-4 font-medium text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {/* Mock empty state if no listings, otherwise map over listings */}
-                  {inventoryRentals.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">
-                        No items in inventory.
-                      </td>
-                    </tr>
-                  ) : (
-                    inventoryRentals.map((booking: any) => (
-                      <tr key={booking.id} className="hover:bg-secondary/20 transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <img src={booking.listingImage || "/placeholder.jpg"} className="w-10 h-10 rounded-md object-cover bg-muted" />
-                            <span className="font-medium text-ink">{booking.listingName}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">₹{booking.rentalPrice}</td>
-                        <td className="px-6 py-4">
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${booking.status === 'active' ? 'bg-green-100 text-green-700' : booking.status === 'completed' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}`}>
-                            {booking.status || 'Active'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 font-medium">₹{booking.rentalPrice * booking.days}</td>
-                        <td className="px-6 py-4 text-right">
-                          <button onClick={() => setEditingBooking(booking)} className="text-muted-foreground hover:text-ink mr-3" title="Edit Rental">
-                            <Edit2 className="h-4 w-4" />
-                          </button>
-                          <button className="text-muted-foreground hover:text-red-500" title="Archive">
-                            <Archive className="h-4 w-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+
+          <div className="grid gap-4">
+            {listings.length === 0 ? (
+              <EmptyState icon={Archive} title="No listed items yet" body="List your first outfit to start accepting rental requests." />
+            ) : (
+              listings.map((listing) => (
+                <div key={listing.id || listing._id} className="border border-border bg-card p-4">
+                  <div className="flex items-center gap-4">
+                    <img
+                      src={listing.imageUrl || listing.image || "/placeholder.jpg"}
+                      alt={listing.title || listing.name}
+                      className="h-20 w-16 bg-muted object-cover"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-ink truncate">{listing.title || listing.name}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {listing.category} / Size {listing.size} / {inr(listing.rentalPricePerDay || listing.pricePerDay)}/day
+                      </p>
+                      <p className="mt-1 text-xs text-primary">
+                        Expected payout per rental day: {inr(Number(listing.rentalPricePerDay || listing.pricePerDay || 0) * 0.85)}
+                      </p>
+                    </div>
+                    <Link
+                      href={`/list-item?relist=${listing.id || listing._id}`}
+                      className="inline-flex shrink-0 items-center gap-1 border border-ink px-3 py-2 text-xs text-ink hover:bg-ink hover:text-cream"
+                    >
+                      <RefreshCcw className="h-3.5 w-3.5" /> Relist
+                    </Link>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}
 
       {activeTab === "earnings" && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-card border border-border p-6 rounded-xl">
-              <h3 className="text-sm font-medium text-muted-foreground mb-1">Total Earnings</h3>
-              <p className="text-3xl font-display text-ink">₹16,500</p>
+        <div className="grid lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-8 border border-border bg-card p-6">
+            <div className="flex items-center justify-between">
+              <h2 className="font-display text-2xl">Earnings overview</h2>
+              <span className="text-xs text-muted-foreground">85% lister payout after platform fee</span>
             </div>
-            <div className="bg-card border border-border p-6 rounded-xl">
-              <h3 className="text-sm font-medium text-muted-foreground mb-1">Pending Payouts</h3>
-              <p className="text-3xl font-display text-primary">₹4,200</p>
-              <button className="text-xs text-primary mt-2 hover:underline">View Details</button>
-            </div>
-            <div className="bg-card border border-border p-6 rounded-xl">
-              <h3 className="text-sm font-medium text-muted-foreground mb-1">Razorpay Route Split</h3>
-              <p className="text-sm text-ink mt-2">Platform Fee: <span className="font-semibold text-red-500">15%</span></p>
-              <p className="text-sm text-ink">Your Cut: <span className="font-semibold text-green-500">85%</span></p>
+            <div className="mt-6 h-[300px]">
+              <EarningsChart data={earningsData} />
             </div>
           </div>
 
-          <div className="bg-card border border-border p-6 rounded-xl">
-            <h3 className="font-display text-xl mb-6">Earnings Overview</h3>
-            <div className="h-[300px] w-full">
-              <EarningsChart data={earningsData} />
+          <div className="lg:col-span-4 border border-border bg-card p-6">
+            <h3 className="font-display text-xl">Payout schedule</h3>
+            <div className="mt-5 space-y-4">
+              <PayoutRow title="Available after return" amount={pendingPayout} note="Moves to your bank/UPI within 48 hours." />
+              <PayoutRow title="Upcoming rentals" amount={upcomingPayout} note="Pending pickup and successful return." />
+              <PayoutRow title="Platform fee" amount={Math.round(totalEarnings * 0.1765)} note="Approx. 15% of rental subtotal." />
             </div>
+          </div>
+
+          <div className="lg:col-span-12 border border-border bg-card">
+            <div className="border-b border-border px-5 py-4">
+              <h3 className="font-display text-xl">Rental history</h3>
+            </div>
+            <BookingList bookings={rentalHistory.length ? rentalHistory : lending} empty="No rental history yet." />
           </div>
         </div>
       )}
 
       {activeTab === "requests" && (
-        <div className="space-y-6">
-          <h2 className="font-display text-2xl">Rental Requests</h2>
+        <div className="space-y-5">
+          <h2 className="font-display text-2xl">Rental requests</h2>
           {pendingRequests.length === 0 ? (
-            <div className="border border-border border-dashed rounded-xl p-12 text-center bg-secondary/30">
-              <Inbox className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
-              <p className="font-medium text-ink">No requests yet</p>
-              <p className="text-sm text-muted-foreground mt-1">You have no pending rental requests.</p>
-            </div>
+            <EmptyState icon={Inbox} title="No pending requests" body="New paid requests and renter questions will appear here." />
           ) : (
-            <div className="space-y-4">
-              {pendingRequests.map((booking: any) => (
-                <div key={booking.id} className="border border-border rounded-xl p-5 bg-card flex flex-col sm:flex-row gap-6 items-start sm:items-center">
-                  <div className="h-16 w-16 bg-muted rounded-full overflow-hidden shrink-0">
-                    <div className="h-full w-full bg-primary/20 flex items-center justify-center text-primary font-bold">
-                      {booking.renterId?.substring(0, 2) || "U"}
-                    </div>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-medium text-ink text-lg">User requested {booking.listingName}</h3>
-                    <p className="text-sm text-muted-foreground mt-1">Dates: {booking.rentalStart} to {booking.rentalEnd}</p>
-                    <p className="text-xs text-primary mt-1 font-medium bg-primary/10 inline-block px-2 py-0.5 rounded">
-                      Earn ₹{booking.rentalPrice * booking.days}
-                    </p>
-                  </div>
-                  <div className="flex gap-2 w-full sm:w-auto">
-                    {booking.status === 'pending' && (
-                      <button onClick={() => handleStatusChange(booking.id, 'declined')} className="flex-1 sm:flex-none px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 font-medium rounded-md text-sm transition-colors">
-                        Decline
-                      </button>
-                    )}
-                    <button onClick={() => handleStatusChange(booking.id, 'active')} className="flex-1 sm:flex-none px-4 py-2 bg-primary text-white hover:bg-primary/90 font-medium rounded-md text-sm transition-colors">
-                      Approve
-                    </button>
-                  </div>
-                </div>
+            pendingRequests.map((booking) => (
+              <BookingCard
+                key={booking.id}
+                booking={booking}
+                primary={{ label: "Approve", onClick: () => handleStatusChange(booking.id, "approved") }}
+                secondary={{ label: "Decline", onClick: () => handleStatusChange(booking.id, "declined") }}
+              />
+            ))
+          )}
+          {activeRentals.length > 0 && (
+            <>
+              <h3 className="font-display text-xl pt-4">Active logistics</h3>
+              {activeRentals.map((booking) => (
+                <BookingCard
+                  key={booking.id}
+                  booking={booking}
+                  primary={{
+                    label: booking.status === "approved" ? "Confirm pickup" : "Confirm return",
+                    onClick: () => handleStatusChange(booking.id, booking.status === "approved" ? "picked_up" : "returned"),
+                  }}
+                />
               ))}
-            </div>
+            </>
           )}
         </div>
       )}
-      {editingBooking && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-xl p-6 w-full max-w-md animate-in fade-in zoom-in duration-200">
-            <h3 className="font-display text-xl mb-4">Edit Active Rental</h3>
-            <p className="text-sm mb-6 text-muted-foreground">Update the status for <strong>{editingBooking.listingName}</strong>.</p>
-            <div className="space-y-3">
-              <button onClick={() => handleStatusChange(editingBooking.id, 'completed').then(() => setEditingBooking(null))} className="w-full btn-primary py-3">Mark as Completed / Returned</button>
-              <button onClick={() => handleStatusChange(editingBooking.id, 'maintenance').then(() => setEditingBooking(null))} className="w-full bg-amber-100 hover:bg-amber-200 text-amber-800 py-3 rounded-lg font-medium transition-colors">Send to Maintenance</button>
-              <button onClick={() => setEditingBooking(null)} className="w-full btn-outline py-3 mt-2">Cancel</button>
-            </div>
+    </div>
+  );
+}
+
+function Metric({ title, value, icon: Icon }: { title: string; value: string; icon: any }) {
+  return (
+    <div className="border border-border bg-card p-5">
+      <Icon className="h-4 w-4 text-primary" />
+      <p className="mt-3 text-xs text-muted-foreground">{title}</p>
+      <p className="mt-1 font-display text-2xl text-ink">{value}</p>
+    </div>
+  );
+}
+
+function TabButton({ active, onClick, icon: Icon, children }: { active: boolean; onClick: () => void; icon: any; children: ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`shrink-0 px-4 py-2 text-sm font-medium transition-colors ${
+        active ? "bg-primary text-white" : "bg-secondary text-ink hover:bg-secondary/80"
+      }`}
+    >
+      <Icon className="mr-2 inline-block h-4 w-4" />
+      {children}
+    </button>
+  );
+}
+
+function PayoutRow({ title, amount, note }: { title: string; amount: number; note: string }) {
+  return (
+    <div className="border border-border p-3">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-medium text-ink">{title}</p>
+        <p className="text-sm font-semibold text-primary">{inr(amount)}</p>
+      </div>
+      <p className="mt-1 text-xs text-muted-foreground">{note}</p>
+    </div>
+  );
+}
+
+function BookingList({ bookings, empty }: { bookings: any[]; empty: string }) {
+  if (!bookings.length) return <div className="p-8 text-center text-sm text-muted-foreground">{empty}</div>;
+  return (
+    <div className="divide-y divide-border">
+      {bookings.map((booking) => (
+        <div key={booking.id} className="grid gap-3 p-5 text-sm md:grid-cols-[1fr_auto_auto] md:items-center">
+          <div>
+            <p className="font-medium text-ink">{booking.listingName}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {booking.rentalStart} to {booking.rentalEnd} / {statusLabels[booking.status] || booking.status}
+            </p>
           </div>
+          <p className="text-ink">{inr(booking.listerEarnings)}</p>
+          <Link href={`/trips/${booking.id}?role=lister`} className="text-xs text-primary hover:underline">
+            Open logistics
+          </Link>
         </div>
-      )}
+      ))}
+    </div>
+  );
+}
+
+function BookingCard({
+  booking,
+  primary,
+  secondary,
+}: {
+  booking: any;
+  primary?: { label: string; onClick: () => void };
+  secondary?: { label: string; onClick: () => void };
+}) {
+  return (
+    <div className="border border-border bg-card p-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+        <img src={booking.listingImage || "/placeholder.jpg"} alt={booking.listingName} className="h-20 w-16 bg-muted object-cover" />
+        <div className="flex-1">
+          <p className="font-medium text-ink">{booking.listingName}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {booking.rentalStart} to {booking.rentalEnd} / Deposit {inr(booking.securityDeposit)}
+          </p>
+          <p className="mt-1 text-xs text-primary">Your payout: {inr(booking.listerEarnings)}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Link href={`/trips/${booking.id}?role=lister`} className="border border-border px-4 py-2 text-xs text-ink hover:bg-secondary">
+            Logistics
+          </Link>
+          {secondary && (
+            <button onClick={secondary.onClick} className="border border-red-200 bg-red-50 px-4 py-2 text-xs text-red-600 hover:bg-red-100">
+              {secondary.label}
+            </button>
+          )}
+          {primary && (
+            <button onClick={primary.onClick} className="bg-primary px-4 py-2 text-xs font-medium text-white hover:bg-primary/90">
+              {primary.label}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EmptyState({ icon: Icon, title, body }: { icon: any; title: string; body: string }) {
+  return (
+    <div className="border border-dashed border-border bg-secondary/30 p-12 text-center">
+      <Icon className="mx-auto h-10 w-10 text-muted-foreground" />
+      <p className="mt-4 font-medium text-ink">{title}</p>
+      <p className="mt-1 text-sm text-muted-foreground">{body}</p>
     </div>
   );
 }

@@ -136,7 +136,7 @@ export async function POST(request) {
           rental_price: subtotal,
           security_deposit: item.listings.security_deposit,
           total_amount: total,
-          status: 'confirmed',
+          status: 'approved',
           payment_status: 'paid',
           fulfillment_status: 'pending',
           lister_earnings: Math.round(subtotal * 0.85),
