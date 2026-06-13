@@ -117,6 +117,19 @@ Implemented email routes:
 - `POST /api/newsletter`
 - `POST /api/password/request-reset`
 
+SMTP backup if Resend is still verifying:
+
+- `EMAIL_SMTP_HOST`
+- `EMAIL_SMTP_PORT`
+- `EMAIL_SMTP_SECURE`
+- `EMAIL_SMTP_USER`
+- `EMAIL_SMTP_PASS`
+- `EMAIL_FROM_EMAIL`
+
+For Gmail, use an app password, not your normal login password.
+The app will try Resend first and automatically fall back to SMTP if Resend
+is not ready or fails.
+
 ## 8) Upstash Redis
 
 Open [Upstash Console](https://console.upstash.com/) -> Redis database -> REST API section.

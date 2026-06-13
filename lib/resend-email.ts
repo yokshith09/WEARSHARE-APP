@@ -1,18 +1,61 @@
+import nodemailer from "nodemailer";
 import { Resend } from "resend";
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+const smtpConfigured =
+  Boolean(process.env.EMAIL_SMTP_HOST) &&
+  Boolean(process.env.EMAIL_SMTP_USER) &&
+  Boolean(process.env.EMAIL_SMTP_PASS);
+
+function resolveFromAddress() {
+  return (
+    process.env.RESEND_FROM_EMAIL ||
+    process.env.EMAIL_FROM_EMAIL ||
+    "WearShare <noreply@wearshare.qzz.io>"
+  );
+}
+
+function getSmtpTransport() {
+  if (!smtpConfigured) return null;
+
+  return nodemailer.createTransport({
+    host: process.env.EMAIL_SMTP_HOST,
+    port: Number(process.env.EMAIL_SMTP_PORT || 587),
+    secure: String(process.env.EMAIL_SMTP_SECURE || "").toLowerCase() === "true",
+    auth: {
+      user: process.env.EMAIL_SMTP_USER,
+      pass: process.env.EMAIL_SMTP_PASS,
+    },
+  });
+}
 
 export function isEmailConfigured() {
-  return Boolean(resend && process.env.RESEND_FROM_EMAIL);
+  return Boolean(resend && process.env.RESEND_FROM_EMAIL) || smtpConfigured;
 }
 
 export async function sendEmail(to: string, subject: string, html: string) {
-  if (!resend || !process.env.RESEND_FROM_EMAIL) {
+  const from = resolveFromAddress();
+
+  if (resend && process.env.RESEND_FROM_EMAIL) {
+    try {
+      return await resend.emails.send({
+        from: process.env.RESEND_FROM_EMAIL,
+        to,
+        subject,
+        html,
+      });
+    } catch (error) {
+      if (!smtpConfigured) throw error;
+    }
+  }
+
+  const transport = getSmtpTransport();
+  if (!transport) {
     return { skipped: true };
   }
 
-  return resend.emails.send({
-    from: process.env.RESEND_FROM_EMAIL,
+  return transport.sendMail({
+    from,
     to,
     subject,
     html,
@@ -30,4 +73,3 @@ export function wearShareEmailShell(content: string) {
     </div>
   `;
 }
-
