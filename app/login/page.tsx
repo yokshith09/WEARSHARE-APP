@@ -1,23 +1,35 @@
 "use client";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { signIn } from "next-auth/react";
+import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { ArrowRight, Mail, Phone, MessageSquare } from "lucide-react";
 import heroImg from "@/assets/hero-lehenga.jpg"; // Reusing an image for the background/side
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-background" />}>
+      <LoginContent />
+    </Suspense>
+  );
+}
+
+function LoginContent() {
+  const searchParams = useSearchParams();
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [method, setMethod] = useState<"phone" | "email">("email");
   const [step, setStep] = useState<"phone" | "otp">("phone");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(searchParams.get("error") ? `Sign-in failed: ${searchParams.get("error")}` : "");
 
   const handleSendOtp = (e: React.FormEvent) => {
     e.preventDefault();
     if (method === "phone" && !phone) return;
     if (method === "email" && !email) return;
     setLoading(true);
+    setError("");
     const normalizedPhone = phone.replace(/\s/g, "").startsWith("+91")
       ? phone.replace(/\s/g, "")
       : `+91${phone.replace(/\D/g, "").slice(-10)}`;
@@ -35,7 +47,7 @@ export default function LoginPage() {
         setStep("otp");
       })
       .catch((err) => {
-        alert(err.message || "Unable to send OTP");
+        setError(err.message || "Unable to send OTP");
       })
       .finally(() => {
       setLoading(false);
@@ -46,13 +58,20 @@ export default function LoginPage() {
     e.preventDefault();
     if (!otp) return;
     setLoading(true);
-    await signIn(method === "phone" ? "msg91-otp" : "email-otp", {
+    setError("");
+    const result = await signIn(method === "phone" ? "msg91-otp" : "email-otp", {
       phone,
       email,
       otp,
       callbackUrl: "/dashboard/renter",
+      redirect: false,
     });
-    // Let next-auth handle redirect
+    setLoading(false);
+    if (result?.error) {
+      setError("Invalid or expired OTP. Please request a fresh code.");
+      return;
+    }
+    window.location.href = result?.url || "/dashboard/renter";
   };
 
   const handleGoogleSignIn = () => {
@@ -97,6 +116,12 @@ export default function LoginPage() {
               </svg>
               Sign in with Google
             </button>
+
+            {error && (
+              <div className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {error}
+              </div>
+            )}
 
             <div className="relative">
               <div className="absolute inset-0 flex items-center">

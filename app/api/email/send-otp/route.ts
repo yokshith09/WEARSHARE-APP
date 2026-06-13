@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { supabaseAdmin } from "@/lib/supabase";
 import { apiLimiter } from "@/lib/rate-limit";
-import { sendEmail, wearShareEmailShell } from "@/lib/resend-email";
+import { isEmailConfigured, sendEmail, wearShareEmailShell } from "@/lib/resend-email";
 
 function normalizeEmail(value: unknown) {
   return String(value || "").trim().toLowerCase();
@@ -21,6 +21,13 @@ export async function POST(request: NextRequest) {
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
       return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
+    }
+
+    if (!isEmailConfigured()) {
+      return NextResponse.json(
+        { error: "Email OTP is not configured. Add RESEND_API_KEY and RESEND_FROM_EMAIL in Vercel." },
+        { status: 503 }
+      );
     }
 
     try {
@@ -44,7 +51,7 @@ export async function POST(request: NextRequest) {
 
     if (insertError) throw insertError;
 
-    await sendEmail(
+    const emailResult = await sendEmail(
       normalizedEmail,
       "Verify your WearShare account",
       wearShareEmailShell(`
@@ -55,10 +62,16 @@ export async function POST(request: NextRequest) {
       `)
     );
 
+    if ((emailResult as any)?.error) {
+      return NextResponse.json(
+        { error: (emailResult as any).error?.message || "Resend could not send this OTP." },
+        { status: 502 }
+      );
+    }
+
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error("[email/send-otp]", error);
     return NextResponse.json({ error: error?.message || "Unable to send email OTP" }, { status: 500 });
   }
 }
-
