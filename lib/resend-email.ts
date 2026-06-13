@@ -15,6 +15,13 @@ function resolveFromAddress() {
   );
 }
 
+function resolveSmtpFromAddress() {
+  return (
+    process.env.EMAIL_FROM_EMAIL ||
+    (process.env.EMAIL_SMTP_USER ? `WearShare <${process.env.EMAIL_SMTP_USER}>` : resolveFromAddress())
+  );
+}
+
 function getSmtpTransport() {
   if (!smtpConfigured) return null;
 
@@ -34,7 +41,17 @@ export function isEmailConfigured() {
 }
 
 export async function sendEmail(to: string, subject: string, html: string) {
-  const from = resolveFromAddress();
+  if (smtpConfigured) {
+    const transport = getSmtpTransport();
+    if (transport) {
+      return transport.sendMail({
+        from: resolveSmtpFromAddress(),
+        to,
+        subject,
+        html,
+      });
+    }
+  }
 
   if (resend && process.env.RESEND_FROM_EMAIL) {
     try {
@@ -49,17 +66,7 @@ export async function sendEmail(to: string, subject: string, html: string) {
     }
   }
 
-  const transport = getSmtpTransport();
-  if (!transport) {
-    return { skipped: true };
-  }
-
-  return transport.sendMail({
-    from,
-    to,
-    subject,
-    html,
-  });
+  return { skipped: true };
 }
 
 export function wearShareEmailShell(content: string) {
