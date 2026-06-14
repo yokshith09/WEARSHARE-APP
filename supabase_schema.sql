@@ -61,6 +61,7 @@ CREATE TABLE public.users (
     name VARCHAR(255),
     email VARCHAR(255) UNIQUE,
     email_verified TIMESTAMPTZ,
+    password_hash TEXT,
     image TEXT,
     phone VARCHAR(20) UNIQUE,
     is_verified BOOLEAN DEFAULT false,

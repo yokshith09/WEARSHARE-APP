@@ -49,6 +49,9 @@ export default function CartPage() {
             <div className="md:col-span-2 space-y-6">
               {items.map((item) => (
                 <div key={item.listingId} className="flex gap-4 p-4 border border-border rounded-xl bg-card shadow-sm">
+                  <div className="h-24 w-20 shrink-0 overflow-hidden rounded-lg bg-muted">
+                    <img src={item.imageUrl || "/placeholder.jpg"} alt={item.name} className="h-full w-full object-cover" />
+                  </div>
                   <div className="flex-1">
                     <p className="eyebrow">{item.category || 'Outfit'}</p>
                     <Link href={`/listing/${item.listingId}`} className="font-display text-xl text-ink hover:text-primary transition-colors block mt-1">

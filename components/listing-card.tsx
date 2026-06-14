@@ -13,6 +13,7 @@ export function ListingCard({ listing, priority = false }: { listing: any; prior
   const rating = listing.ownerId?.rating || listing.rating || 4.5;
   const area = listing.area || listing.city || 'Bengaluru';
   const city = listing.city || '';
+  const location = city && city !== area ? `${area}, ${city}` : area;
   const size = listing.size;
   const category = listing.category;
 
@@ -63,7 +64,7 @@ export function ListingCard({ listing, priority = false }: { listing: any; prior
               {title}
             </h3>
             <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-              <MapPin className="h-3 w-3" /> {city ? `${area}, ${city}` : area}
+              <MapPin className="h-3 w-3" /> {location}
             </p>
           </div>
           <div className="shrink-0 text-right">

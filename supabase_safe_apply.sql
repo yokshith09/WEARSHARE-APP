@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS public.users (
     name VARCHAR(255),
     email VARCHAR(255) UNIQUE,
     email_verified TIMESTAMPTZ,
+    password_hash TEXT,
     image TEXT,
     phone VARCHAR(20) UNIQUE,
     is_verified BOOLEAN DEFAULT false,
@@ -74,6 +75,7 @@ ALTER TABLE public.users ADD COLUMN IF NOT EXISTS phone VARCHAR(20);
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS name VARCHAR(255);
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS email VARCHAR(255);
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS email_verified TIMESTAMPTZ;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS password_hash TEXT;
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS image TEXT;
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT false;
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS rating NUMERIC(3, 2) DEFAULT 4.5;

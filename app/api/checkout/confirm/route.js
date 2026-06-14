@@ -105,7 +105,7 @@ export async function POST(request) {
 
     const { data: renter } = await supabaseAdmin
       .from('users')
-      .select('name, phone, email')
+      .select('name, email')
       .eq('id', session.user.id)
       .single()
 

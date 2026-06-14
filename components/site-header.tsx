@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { Gem, Heart, LayoutDashboard, Menu, Search, ShoppingCart, User, X } from "lucide-react";
 
 const navLinks = [
@@ -13,6 +14,8 @@ const navLinks = [
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
   const [cartCount, setCartCount] = useState(0);
+  const { status } = useSession();
+  const accountHref = status === "authenticated" ? "/profile" : "/login?callbackUrl=/profile";
 
   useEffect(() => {
     fetch('/api/cart')
@@ -58,7 +61,7 @@ export function SiteHeader() {
             <LayoutDashboard className="h-4 w-4 text-ink" />
           </Link>
 
-          <Link href="/login" aria-label="Account" className="hidden h-10 w-10 items-center justify-center rounded-md bg-secondary/60 hover:bg-secondary sm:flex">
+          <Link href={accountHref} aria-label="Account" className="hidden h-10 w-10 items-center justify-center rounded-md bg-secondary/60 hover:bg-secondary sm:flex">
             <User className="h-4 w-4 text-ink" />
           </Link>
 
@@ -96,12 +99,15 @@ export function SiteHeader() {
                 <span className="text-muted-foreground">View</span>
               </Link>
             ))}
-            <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="mt-3 grid gap-2 sm:grid-cols-3">
               <Link href="/list-item" onClick={() => setOpen(false)} className="btn-primary text-sm">
                 <Heart className="h-4 w-4" /> List item
               </Link>
               <Link href="/dashboard" onClick={() => setOpen(false)} className="btn-outline text-sm">
                 Dashboard
+              </Link>
+              <Link href={accountHref} onClick={() => setOpen(false)} className="btn-outline text-sm">
+                Profile
               </Link>
             </div>
           </nav>

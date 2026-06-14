@@ -1,9 +1,0 @@
-.git
-.gitignore
-.gcloudignore
-.next
-.codex
-node_modules
-.env
-.env.*
-*.log

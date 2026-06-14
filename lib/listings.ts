@@ -24,7 +24,7 @@ export type Listing = {
   reviews: number;
   verified: boolean;
   fitScore: number;
-  unavailableDates?: string[]; // ISO date strings
+  unavailableDates?: string[];
   reviewItems?: { author: string; rating: number; date: string; text: string }[];
 };
 
@@ -175,16 +175,15 @@ export const listings: Listing[] = [
     verified: true,
     fitScore: 91,
   },
-].map((l, i) => ({
-  ...l,
-  unavailableDates: blockedDates.slice(i % 3, (i % 3) + 4),
+].map((listing, index) => ({
+  ...listing,
+  unavailableDates: blockedDates.slice(index % 3, (index % 3) + 4),
   reviewItems: sampleReviews,
 }));
 
-export const getListing = (id: string) => listings.find((l) => l.id === id);
+export const getListing = (id: string) => listings.find((listing) => listing.id === id);
 
-export const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`;
+export const inr = (n: number) => `Rs ${n.toLocaleString("en-IN")}`;
 
 export const isDateBlocked = (listing: Listing, date: Date) =>
   (listing.unavailableDates ?? []).includes(date.toISOString().slice(0, 10));
-

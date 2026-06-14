@@ -6,19 +6,28 @@ import {
 } from "lucide-react";
 import { differenceInCalendarDays, format } from "date-fns";
 import type { DateRange } from "react-day-picker";
-import { getListing, listings, inr, isDateBlocked } from "@/lib/listings";
+import { inr, isDateBlocked } from "@/lib/listings";
 import { ListingCard } from "@/components/listing-card";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useParams, notFound, useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { trackEvent } from "@/lib/analytics";
 
 export default function ListingDetail() {
   const params = useParams();
+  const router = useRouter();
   const id = params.id as string;
   const [listing, setListing] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [others, setOthers] = useState<any[]>([]);
+  const [range, setRange] = useState<DateRange | undefined>();
+  const [addingToCart, setAddingToCart] = useState(false);
+  const [cartError, setCartError] = useState("");
+
+  const days = useMemo(() => {
+    if (range?.from && range?.to) return Math.max(1, differenceInCalendarDays(range.to, range.from) + 1);
+    return 0;
+  }, [range]);
 
   useEffect(() => {
     fetch(`/api/listings/${id}`)
@@ -74,14 +83,6 @@ export default function ListingDetail() {
   const listerInitial = listerName.charAt(0);
   const deposit = listing.securityDeposit || listing.deposit || 0;
   const retailPrice = listing.buyPrice || listing.retailPrice || (price * 20);
-  const [range, setRange] = useState<DateRange | undefined>();
-  const [addingToCart, setAddingToCart] = useState(false);
-  const router = useRouter();
-
-  const days = useMemo(() => {
-    if (range?.from && range?.to) return Math.max(1, differenceInCalendarDays(range.to, range.from) + 1);
-    return 0;
-  }, [range]);
   
   const subtotal = days * price;
   const protectionFee = Math.round(subtotal * 0.05);
@@ -90,6 +91,7 @@ export default function ListingDetail() {
   const addToCart = async () => {
     if (!range?.from || !range?.to || days <= 0) return;
     setAddingToCart(true);
+    setCartError("");
     try {
       const res = await fetch('/api/cart', {
         method: 'POST',
@@ -104,11 +106,15 @@ export default function ListingDetail() {
       if (res.ok) {
          trackEvent("add_to_cart", { listingId: listing._id || listing.id, days, source: "rent_now" });
          router.push('/cart');
+      } else if (res.status === 401) {
+         router.push(`/login?callbackUrl=/listing/${listing._id || listing.id}`);
       } else {
-         console.error('Failed to add to cart');
+         const data = await res.json().catch(() => ({}));
+         setCartError(data.error || 'Unable to add this outfit to cart.');
       }
     } catch (e) {
       console.error(e);
+      setCartError('Unable to add this outfit to cart.');
     } finally {
       setAddingToCart(false);
     }
@@ -224,7 +230,7 @@ export default function ListingDetail() {
                   if (!range?.from || !range?.to || days <= 0) return;
                   setAddingToCart(true);
                   try {
-                    await fetch('/api/cart', {
+                    const res = await fetch('/api/cart', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({
@@ -234,6 +240,15 @@ export default function ListingDetail() {
                         rentalEnd: range.to?.toISOString().split("T")[0],
                       })
                     });
+                    if (res.status === 401) {
+                      router.push(`/login?callbackUrl=/listing/${listing._id || listing.id}`);
+                      return;
+                    }
+                    if (!res.ok) {
+                      const data = await res.json().catch(() => ({}));
+                      setCartError(data.error || 'Unable to add this outfit to cart.');
+                      return;
+                    }
                     trackEvent("add_to_cart", { listingId: listing._id || listing.id, days, source: "detail" });
                     // Just add to cart, no redirect
                     setAddingToCart(false);
@@ -258,6 +273,7 @@ export default function ListingDetail() {
               Pick dates to continue
             </button>
           )}
+          {cartError && <p className="mt-3 text-sm text-red-600">{cartError}</p>}
           <Link
             href={`/trips/${listing._id || listing.id}`}
             className="mt-2 w-full border border-ink text-ink rounded-xl py-3.5 text-sm font-medium hover:bg-ink hover:text-cream transition-colors flex items-center justify-center gap-2"

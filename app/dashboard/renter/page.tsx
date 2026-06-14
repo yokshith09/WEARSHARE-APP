@@ -19,22 +19,56 @@ const statusRank: Record<string, number> = {
   returned: 3,
 };
 
+const measurementFields = [
+  ["height", "Height (cm)"],
+  ["chest", "Chest (cm)"],
+  ["waist", "Waist (cm)"],
+  ["hips", "Hips (cm)"],
+] as const;
+
 const inr = (value: number) => `Rs ${Math.round(Number(value || 0)).toLocaleString("en-IN")}`;
 
 export default function RenterDashboard() {
   const [activeTab, setActiveTab] = useState<"orders" | "wishlist" | "measurements">("orders");
   const [data, setData] = useState<{ rentals?: any[] }>({ rentals: [] });
+  const [wishlist, setWishlist] = useState<any[]>([]);
+  const [measurements, setMeasurements] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const [savingMeasurements, setSavingMeasurements] = useState(false);
+  const [measurementMessage, setMeasurementMessage] = useState("");
 
   useEffect(() => {
-    fetch("/api/bookings")
-      .then((res) => res.json())
-      .then((resData) => {
-        setData(resData);
-        setLoading(false);
+    Promise.all([
+      fetch("/api/bookings").then((res) => res.json()),
+      fetch("/api/wishlist").then((res) => (res.ok ? res.json() : { wishlist: [] })),
+      fetch("/api/profile").then((res) => (res.ok ? res.json() : null)),
+    ])
+      .then(([bookingData, wishlistData, profileData]: [any, any, { measurements?: Record<string, string> } | null]) => {
+        setData(bookingData);
+        setWishlist(Array.isArray(wishlistData?.wishlist) ? wishlistData.wishlist : []);
+        setMeasurements(profileData?.measurements || {});
       })
-      .catch(() => setLoading(false));
+      .finally(() => setLoading(false));
   }, []);
+
+  const saveMeasurements = async () => {
+    setSavingMeasurements(true);
+    setMeasurementMessage("");
+    try {
+      const res = await fetch("/api/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ measurements }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || "Unable to save measurements");
+      setMeasurementMessage("Measurements saved.");
+    } catch (error) {
+      setMeasurementMessage(error instanceof Error ? error.message : "Unable to save measurements");
+    } finally {
+      setSavingMeasurements(false);
+    }
+  };
 
   if (loading) {
     return <div className="py-12 text-center text-muted-foreground">Loading your rentals...</div>;
@@ -113,11 +147,32 @@ export default function RenterDashboard() {
       {activeTab === "wishlist" && (
         <div className="space-y-6">
           <h2 className="font-display text-2xl">Your wishlist</h2>
-          <div className="border border-border border-dashed bg-secondary/30 p-12 text-center">
-            <Heart className="mx-auto mb-4 h-10 w-10 text-muted-foreground" />
-            <p className="font-medium text-ink">Coming soon</p>
-            <p className="mt-1 text-sm text-muted-foreground">Saved outfits will appear here.</p>
-          </div>
+          {wishlist.length === 0 ? (
+            <div className="border border-border border-dashed bg-secondary/30 p-12 text-center">
+              <Heart className="mx-auto mb-4 h-10 w-10 text-muted-foreground" />
+              <p className="font-medium text-ink">No saved outfits yet</p>
+              <p className="mt-1 text-sm text-muted-foreground">Browse pieces you love and save them here for later.</p>
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {wishlist.map((item) => (
+                <Link key={item.id} href={`/listing/${item.id}`} className="flex gap-4 border border-border bg-card p-4 transition-colors hover:border-ink">
+                  <img
+                    src={item.image_url || item.imageUrl || item.image || "/placeholder.jpg"}
+                    alt={item.title || item.name}
+                    className="h-24 w-20 shrink-0 bg-muted object-cover"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-ink">{item.title || item.name}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {item.category || "Outfit"} / Size {item.size || "Free"}
+                    </p>
+                    <p className="mt-3 text-sm font-semibold text-ink">{inr(item.rental_price_per_day || item.rentalPricePerDay || item.pricePerDay || 0)}/day</p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -130,14 +185,24 @@ export default function RenterDashboard() {
           <div className="border border-border bg-card p-6">
             <p className="mb-6 text-sm text-muted-foreground">Enter measurements to improve fit predictions on outfits.</p>
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-              {["Height (cm)", "Chest (cm)", "Waist (cm)", "Hips (cm)"].map((label) => (
-                <div key={label} className="space-y-2">
+              {measurementFields.map(([key, label]) => (
+                <div key={key} className="space-y-2">
                   <label className="text-sm font-medium">{label}</label>
-                  <input type="number" className="w-full border border-border bg-background px-3 py-2 text-sm" />
+                  <input
+                    type="number"
+                    className="w-full border border-border bg-background px-3 py-2 text-sm"
+                    value={measurements[key] || ""}
+                    onChange={(event) => setMeasurements((current) => ({ ...current, [key]: event.target.value }))}
+                  />
                 </div>
               ))}
             </div>
-            <button className="btn-primary mt-6 w-full md:w-auto">Save measurements</button>
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              <button onClick={saveMeasurements} disabled={savingMeasurements} className="btn-primary w-full md:w-auto">
+                {savingMeasurements ? "Saving..." : "Save measurements"}
+              </button>
+              {measurementMessage && <p className="text-sm text-muted-foreground">{measurementMessage}</p>}
+            </div>
           </div>
         </div>
       )}

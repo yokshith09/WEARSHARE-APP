@@ -8,16 +8,45 @@ import { ListingCard } from "@/components/listing-card";
 import { supabaseAdmin } from "@/lib/supabase";
 import { WaitlistForm } from "@/components/waitlist-form";
 
-// Cache this page and revalidate every 60 seconds
 export const revalidate = 60;
 
+type HomeListing = {
+  _id?: string;
+  id: string;
+  name?: string;
+  title: string;
+  description?: string;
+  category?: string;
+  city?: string;
+  pincode?: string;
+  area?: string;
+  size?: string;
+  condition?: string;
+  rentalPricePerDay?: number;
+  pricePerDay?: number;
+  securityDeposit?: number;
+  deposit?: number;
+  imageUrl?: string;
+  image?: string;
+  available?: boolean;
+  ownerId?: {
+    _id: string;
+    name: string;
+    isVerified: boolean;
+    rating: number;
+  } | null;
+  lister?: string;
+};
+
 export default async function Index() {
-  let featured = [];
-  let editorial = [];
+  let featured: HomeListing[] = [];
+  let editorial: HomeListing[] = [];
+  let locationLabel = "Bengaluru";
+  let pincodeLabel = "560038";
 
   try {
     const { data: listings, error } = await supabaseAdmin
-      .from('listings')
+      .from("listings")
       .select(`
         *,
         owner:users!owner_id (
@@ -27,77 +56,83 @@ export default async function Index() {
           rating
         )
       `)
-      .eq('available', true)
-      .order('created_at', { ascending: false })
-      .limit(10)
-    
-    if (error) throw error
+      .eq("available", true)
+      .order("created_at", { ascending: false })
+      .limit(10);
 
-    // Map Supabase relational data to match the expected frontend structure
-    const plainData = (listings || []).map(l => ({
-      _id: l.id,
-      id: l.id,
-      name: l.title,
-      title: l.title,
-      description: l.description,
-      category: l.category,
-      city: l.city,
-      pincode: l.pincode,
-      area: l.area,
-      size: l.size,
-      condition: l.condition,
-      rentalPricePerDay: l.rental_price_per_day,
-      pricePerDay: l.rental_price_per_day,
-      securityDeposit: l.security_deposit,
-      deposit: l.security_deposit,
-      imageUrl: l.image_url,
-      image: l.image_url,
-      available: l.available,
-      ownerId: l.owner ? {
-        _id: l.owner.id,
-        name: l.owner.name,
-        isVerified: l.owner.is_verified,
-        rating: l.owner.rating
-      } : null,
-      lister: l.owner?.name
-    }))
+    if (error) throw error;
 
-    if (plainData && plainData.length > 0) {
+    const plainData: HomeListing[] = (listings || []).map((listing) => ({
+      _id: listing.id,
+      id: listing.id,
+      name: listing.title,
+      title: listing.title,
+      description: listing.description,
+      category: listing.category,
+      city: listing.city,
+      pincode: listing.pincode,
+      area: listing.area,
+      size: listing.size,
+      condition: listing.condition,
+      rentalPricePerDay: listing.rental_price_per_day,
+      pricePerDay: listing.rental_price_per_day,
+      securityDeposit: listing.security_deposit,
+      deposit: listing.security_deposit,
+      imageUrl: listing.image_url,
+      image: listing.image_url,
+      available: listing.available,
+      ownerId: listing.owner
+        ? {
+            _id: listing.owner.id,
+            name: listing.owner.name,
+            isVerified: listing.owner.is_verified,
+            rating: listing.owner.rating,
+          }
+        : null,
+      lister: listing.owner?.name,
+    }));
+
+    if (plainData.length > 0) {
       featured = plainData.slice(0, 4);
-      editorial = plainData.slice(2, 5);
+      editorial = plainData.length >= 3 ? plainData.slice(2, 5) : plainData.slice(0, 3);
+      locationLabel = plainData[0]?.city || plainData[0]?.area || locationLabel;
+      pincodeLabel = plainData[0]?.pincode || pincodeLabel;
+      if (editorial.length < 3) {
+        editorial = [...editorial, ...dummyListings].slice(0, 3) as HomeListing[];
+      }
     } else {
-      featured = dummyListings.slice(0, 4);
-      editorial = dummyListings.slice(2, 5);
+      featured = dummyListings.slice(0, 4) as HomeListing[];
+      editorial = dummyListings.slice(2, 5) as HomeListing[];
     }
   } catch (error) {
     console.error("Failed to fetch listings for landing page:", error);
-    featured = dummyListings.slice(0, 4);
-    editorial = dummyListings.slice(2, 5);
+    featured = dummyListings.slice(0, 4) as HomeListing[];
+    editorial = dummyListings.slice(2, 5) as HomeListing[];
   }
 
   return (
     <div className="bg-background">
-      {/* HERO - editorial split */}
-      <section className="container-edit pt-10 md:pt-16 pb-20 md:pb-28">
-        <div className="grid md:grid-cols-12 gap-10 md:gap-16 items-end">
-          <div className="md:col-span-7 order-2 md:order-1">
+      <section className="container-edit pt-10 pb-20 md:pt-16 md:pb-28">
+        <div className="grid items-end gap-10 md:grid-cols-12 md:gap-16">
+          <div className="order-2 md:order-1 md:col-span-7">
             <p className="eyebrow animate-fade-up">A neighbourhood wardrobe / Est. Bengaluru</p>
             <h1 className="mt-5 font-display text-[clamp(2.75rem,7vw,6rem)] leading-[0.95] text-ink animate-fade-up">
-              Wear it once.<br />
+              Wear it once.
+              <br />
               <span className="italic text-primary">Share</span> it forward.
             </h1>
-            <p className="mt-7 max-w-xl text-base md:text-lg text-muted-foreground leading-relaxed animate-fade-up">
-              Premium outfits for weddings, parties and college nights - rented from verified listers within
+            <p className="mt-7 max-w-xl text-base leading-relaxed text-muted-foreground animate-fade-up md:text-lg">
+              Premium outfits for weddings, parties and college nights, rented from verified listers within
               your pincode. No fast fashion. No storage. No regrets.
             </p>
-            <form action="/browse" className="mt-9 flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-3 animate-fade-up">
-              <div className="flex items-center bg-background border border-border rounded-lg px-4 py-1 w-full sm:w-auto">
-                <MapPin className="h-4 w-4 text-muted-foreground mr-2 shrink-0" />
+            <form action="/browse" className="mt-9 flex flex-col flex-wrap items-start gap-3 animate-fade-up sm:flex-row sm:items-center">
+              <div className="flex w-full items-center rounded-lg border border-border bg-background px-4 py-1 sm:w-auto">
+                <MapPin className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
                 <input
                   type="text"
                   name="pincode"
                   placeholder="Enter Pincode (e.g. 560038)"
-                  className="bg-transparent border-none outline-none text-sm w-full sm:w-48 py-2.5 text-ink"
+                  className="w-full border-none bg-transparent py-2.5 text-sm text-ink outline-none sm:w-48"
                   maxLength={6}
                 />
               </div>
@@ -105,25 +140,25 @@ export default async function Index() {
                 Browse outfits near you
                 <ArrowUpRight className="h-4 w-4 shrink-0" />
               </button>
-              <Link href="/list-item" className="btn-outline w-full sm:w-auto text-center">
+              <Link href="/list-item" className="btn-outline w-full text-center sm:w-auto">
                 List your wardrobe
               </Link>
             </form>
-            <dl className="mt-12 grid grid-cols-3 gap-6 max-w-lg">
+            <dl className="mt-12 grid max-w-lg grid-cols-3 gap-6">
               {[
                 ["10-20%", "of retail price"],
-                ["₹500-5K", "earned monthly"],
+                ["Rs 500-5K", "earned monthly"],
                 ["48h", "lister response"],
-              ].map(([n, l]) => (
-                <div key={l}>
-                  <dt className="font-display text-2xl text-rust">{n}</dt>
-                  <dd className="text-xs text-muted-foreground mt-1">{l}</dd>
+              ].map(([number, label]) => (
+                <div key={label}>
+                  <dt className="font-display text-2xl text-rust">{number}</dt>
+                  <dd className="mt-1 text-xs text-muted-foreground">{label}</dd>
                 </div>
               ))}
             </dl>
           </div>
 
-          <div className="md:col-span-5 order-1 md:order-2 relative">
+          <div className="relative order-1 md:order-2 md:col-span-5">
             <div className="relative aspect-[3/4] overflow-hidden rounded-xl">
               <Image
                 src={heroImg}
@@ -136,10 +171,10 @@ export default async function Index() {
             </div>
             <div className="panel absolute -bottom-6 -left-4 max-w-[240px] p-5 md:-left-10">
               <p className="eyebrow">This look</p>
-              <p className="font-display text-base mt-1 text-ink leading-snug">Emerald Silk Lehenga by Deepa M.</p>
-              <p className="text-xs text-muted-foreground mt-2">Indiranagar / 2.4 km</p>
+              <p className="mt-1 font-display text-base leading-snug text-ink">Emerald Silk Lehenga by Deepa M.</p>
+              <p className="mt-2 text-xs text-muted-foreground">Indiranagar / 2.4 km</p>
               <div className="mt-3 flex items-center justify-between text-xs">
-                <span className="text-ink font-medium">{inr(1800)}/day</span>
+                <span className="font-medium text-ink">{inr(1800)}/day</span>
                 <span className="flex items-center gap-1 text-muted-foreground">
                   <Star className="h-3 w-3 fill-primary text-primary" /> 4.9
                 </span>
@@ -149,11 +184,10 @@ export default async function Index() {
         </div>
       </section>
 
-      {/* MARQUEE */}
-      <div className="border-y border-border py-5 overflow-hidden bg-secondary/40">
+      <div className="overflow-hidden border-y border-border bg-secondary/40 py-5">
         <div className="flex gap-12 whitespace-nowrap animate-marquee">
-          {[...Array(2)].map((_, i) => (
-            <div key={i} className="flex gap-12 items-center text-sm font-display italic text-ink/70">
+          {[...Array(2)].map((_, index) => (
+            <div key={index} className="flex items-center gap-12 text-sm font-display italic text-ink/70">
               <span>Weddings</span><span> / </span>
               <span>Sangeet</span><span> / </span>
               <span>Receptions</span><span> / </span>
@@ -169,64 +203,61 @@ export default async function Index() {
         </div>
       </div>
 
-      {/* FEATURED LISTINGS */}
       <section className="container-edit py-20 md:py-28">
-        <div className="flex items-end justify-between mb-10 md:mb-14">
+        <div className="mb-10 flex items-end justify-between md:mb-14">
           <div>
-            <p className="eyebrow">In your neighbourhood / Bengaluru 560038</p>
-            <h2 className="font-display text-4xl md:text-5xl text-ink mt-3">This week's picks</h2>
+            <p className="eyebrow">In your neighbourhood / {locationLabel} {pincodeLabel}</p>
+            <h2 className="mt-3 font-display text-4xl text-ink md:text-5xl">This week&apos;s picks</h2>
           </div>
-          <Link href="/browse" className="hidden md:inline-flex items-center gap-1 text-sm text-ink border-b border-ink pb-1 hover:text-primary hover:border-primary transition-colors">
+          <Link href="/browse" className="hidden items-center gap-1 border-b border-ink pb-1 text-sm text-ink transition-colors hover:border-primary hover:text-primary md:inline-flex">
             View all outfits <ArrowUpRight className="h-4 w-4" />
           </Link>
         </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-5 gap-y-12">
-          {featured.map((l, i) => (
-            <ListingCard key={l._id || l.id} listing={l} priority={i < 2} />
+        <div className="grid grid-cols-2 gap-x-5 gap-y-12 lg:grid-cols-4">
+          {featured.map((listing, index) => (
+            <ListingCard key={listing._id || listing.id} listing={listing} priority={index < 2} />
           ))}
         </div>
       </section>
 
-      {/* HOW IT WORKS */}
-      <section className="bg-secondary/40 border-y border-border">
-        <div className="container-edit py-20 md:py-28 grid md:grid-cols-12 gap-12">
+      <section className="border-y border-border bg-secondary/40">
+        <div className="container-edit grid gap-12 py-20 md:grid-cols-12 md:py-28">
           <div className="md:col-span-4">
             <p className="eyebrow">How WearShare works</p>
-            <h2 className="font-display text-4xl md:text-5xl mt-3 text-ink leading-tight">
+            <h2 className="mt-3 font-display text-4xl leading-tight text-ink md:text-5xl">
               Three steps. <span className="italic text-primary">Zero stress.</span>
             </h2>
             <p className="mt-5 text-muted-foreground">
               Designed for first-time renters and listers. Every step protected by deposit cover and our
               48-hour damage resolution promise.
             </p>
-            <Link href="/how-it-works" className="mt-8 inline-flex items-center gap-1 text-sm text-ink border-b border-ink pb-1 hover:text-primary hover:border-primary">
+            <Link href="/how-it-works" className="mt-8 inline-flex items-center gap-1 border-b border-ink pb-1 text-sm text-ink hover:border-primary hover:text-primary">
               The full process <ArrowUpRight className="h-4 w-4" />
             </Link>
           </div>
-          <div className="md:col-span-8 grid sm:grid-cols-3 gap-px bg-border">
+          <div className="grid gap-px bg-border sm:grid-cols-3 md:col-span-8">
             {[
               { n: "01", icon: MapPin, t: "Discover near you", d: "Filter by occasion, size, distance and the date you need it. Real photos. Real fits." },
               { n: "02", icon: Calendar, t: "Book the dates", d: "Pay rental + deposit through UPI. Lister confirms within 48 hours. Pickup or delivery." },
               { n: "03", icon: ShieldCheck, t: "Wear, return, review", d: "Return cleaned. Deposit released within 24 hrs. Both sides leave a review." },
             ].map(({ n, icon: Icon, t, d }) => (
-              <div key={n} className="bg-background p-7 md:p-8 flex flex-col gap-4">
+              <div key={n} className="flex flex-col gap-4 bg-background p-7 md:p-8">
                 <div className="flex items-center justify-between">
                   <span className="font-display text-2xl italic text-primary">{n}</span>
                   <Icon className="h-5 w-5 text-ink" />
                 </div>
-                <h3 className="font-display text-xl text-ink leading-snug">{t}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">{d}</p>
+                <h3 className="font-display text-xl leading-snug text-ink">{t}</h3>
+                <p className="text-sm leading-relaxed text-muted-foreground">{d}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* EDITORIAL EARN BLOCK */}
       <section className="container-edit py-24 md:py-32">
-        <div className="grid md:grid-cols-12 gap-12 md:gap-20 items-center">
-          <div className="md:col-span-6 relative">
-            <div className="relative w-full aspect-[4/3] rounded-xl overflow-hidden">
+        <div className="grid items-center gap-12 md:grid-cols-12 md:gap-20">
+          <div className="relative md:col-span-6">
+            <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl">
               <Image
                 src={communityImg}
                 alt="Friends sharing outfits in a sunlit room"
@@ -235,36 +266,38 @@ export default async function Index() {
                 className="object-cover"
               />
             </div>
-            <div className="absolute -top-5 -right-5 bg-primary text-primary-foreground p-5 max-w-[200px] hidden md:block rounded-xl shadow-lg">
-              <Sparkles className="h-4 w-4 mb-2" />
+            <div className="absolute -right-5 -top-5 hidden max-w-[200px] rounded-xl bg-primary p-5 text-primary-foreground shadow-lg md:block">
+              <Sparkles className="mb-2 h-4 w-4" />
               <p className="font-display text-sm leading-snug">73% of clothes in Indian wardrobes are worn fewer than 3 times.</p>
             </div>
           </div>
           <div className="md:col-span-6">
             <p className="eyebrow">For listers</p>
-            <h2 className="font-display text-4xl md:text-5xl mt-3 text-ink leading-tight">
-              Your wardrobe<br />is already <span className="italic text-primary">earning.</span>
+            <h2 className="mt-3 font-display text-4xl leading-tight text-ink md:text-5xl">
+              Your wardrobe
+              <br />
+              is already <span className="italic text-primary">earning.</span>
             </h2>
-            <p className="mt-6 text-muted-foreground max-w-md leading-relaxed">
+            <p className="mt-6 max-w-md leading-relaxed text-muted-foreground">
               Lehengas worn at one wedding. Suits gathering dust. Sarees passed down but unworn.
-              List them in three minutes. Approve who rents. Earn ₹500-₹5,000 every month.
+              List them in three minutes. Approve who rents. Earn Rs 500-Rs 5,000 every month.
             </p>
             <ul className="mt-8 space-y-3 text-sm">
               {[
-                "Damage cover on every booking - automatically",
+                "Damage cover on every booking, automatically",
                 "AI-assisted listing, live in under 5 minutes",
                 "You approve every renter before they pay",
                 "Payouts to UPI within 48 hours of return",
-              ].map((b) => (
-                <li key={b} className="flex gap-3 items-start">
-                  <span className="mt-2 h-1 w-3 bg-primary inline-block shrink-0" />
-                  <span className="text-ink">{b}</span>
+              ].map((bullet) => (
+                <li key={bullet} className="flex items-start gap-3">
+                  <span className="mt-2 inline-block h-1 w-3 shrink-0 bg-primary" />
+                  <span className="text-ink">{bullet}</span>
                 </li>
               ))}
             </ul>
             <div className="mt-9 flex gap-3">
               <Link href="/list-item" className="btn-secondary">
-                Start listing - it's free
+                Start listing - it&apos;s free
                 <ArrowUpRight className="h-4 w-4" />
               </Link>
             </div>
@@ -272,121 +305,95 @@ export default async function Index() {
         </div>
       </section>
 
-      {/* TRUST / VOICES */}
       <section className="bg-ink text-cream">
         <div className="container-edit py-24 md:py-32">
           <p className="eyebrow text-cream/60">Voices from the community</p>
-          <h2 className="font-display text-4xl md:text-6xl mt-4 max-w-4xl leading-[1.05]">
-            "I wore a ₹40,000 lehenga to my best friend's wedding for <span className="italic text-primary">₹1,500</span> - and she didn't recognise it was rented."
+          <h2 className="mt-4 max-w-4xl font-display text-4xl leading-[1.05] md:text-6xl">
+            "I wore a Rs 40,000 lehenga to my best friend&apos;s wedding for <span className="italic text-primary">Rs 1,500</span> and she didn&apos;t recognise it was rented."
           </h2>
-          <p className="mt-8 text-cream/60 text-sm">- Priya, 24 / Bengaluru</p>
+          <p className="mt-8 text-sm text-cream/60">- Priya, 24 / Bengaluru</p>
 
-          <div className="mt-20 grid md:grid-cols-3 gap-px bg-cream/10">
+          <div className="mt-20 grid gap-px bg-cream/10 md:grid-cols-3">
             {[
-              { q: "Earned ₹18,400 from sarees that hadn't moved in two years.", a: "Deepa M., Indiranagar" },
+              { q: "Earned Rs 18,400 from sarees that had not moved in two years.", a: "Deepa M., Indiranagar" },
               { q: "Pickup was 800 metres away. I walked there with my laptop bag.", a: "Rahul S., HSR" },
               { q: "Reviewed every renter. Felt safer than selling secondhand online.", a: "Meera J., Indiranagar" },
-            ].map((v) => (
-              <div key={v.a} className="bg-ink p-8">
-                <p className="font-display text-xl leading-snug">"{v.q}"</p>
-                <p className="mt-5 text-xs text-cream/60 uppercase tracking-widest">{v.a}</p>
+            ].map((voice) => (
+              <div key={voice.a} className="bg-ink p-8">
+                <p className="font-display text-xl leading-snug">"{voice.q}"</p>
+                <p className="mt-5 text-xs uppercase tracking-widest text-cream/60">{voice.a}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* EDITORIAL GRID - secondary */}
-      <section className="container-edit py-24 md:py-32">
-        <div className="flex items-end justify-between mb-12">
-          <div>
-            <p className="eyebrow">Edit no. 02</p>
-            <h2 className="font-display text-4xl md:text-5xl mt-3 text-ink">For the season ahead</h2>
+      {editorial.length > 0 && (
+        <section className="container-edit py-24 md:py-32">
+          <div className="mb-12 flex items-end justify-between">
+            <div>
+              <p className="eyebrow">Edit no. 02</p>
+              <h2 className="mt-3 font-display text-4xl text-ink md:text-5xl">For the season ahead</h2>
+            </div>
           </div>
-        </div>
-        <div className="grid md:grid-cols-12 gap-5">
-          <div className="md:col-span-7">
-            {editorial[0] && <ListingCard listing={editorial[0]} />}
+          <div className="grid gap-5 md:grid-cols-12">
+            <div className="md:col-span-7">
+              {editorial[0] && <ListingCard listing={editorial[0]} />}
+            </div>
+            <div className="grid gap-5 md:col-span-5">
+              {editorial[1] && <ListingCard listing={editorial[1]} />}
+              {editorial[2] && <ListingCard listing={editorial[2]} />}
+            </div>
           </div>
-          <div className="md:col-span-5 grid gap-5">
-            {editorial[1] && <ListingCard listing={editorial[1]} />}
-            {editorial[2] && <ListingCard listing={editorial[2]} />}
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
-      {/* COLLECTIONS */}
       <section className="container-edit py-24 md:py-32">
-        <div className="flex items-end justify-between mb-12">
+        <div className="mb-12 flex items-end justify-between">
           <div>
             <p className="eyebrow">Curated for you</p>
-            <h2 className="font-display text-4xl md:text-5xl mt-3 text-ink">Shop by Collection</h2>
+            <h2 className="mt-3 font-display text-4xl text-ink md:text-5xl">Shop by Collection</h2>
           </div>
         </div>
-        <div className="grid md:grid-cols-3 gap-8">
-          <Link href="/browse?category=men" className="group relative aspect-[4/5] overflow-hidden rounded-xl block shadow-sm hover:shadow-md transition-shadow">
-            <Image 
-              src="/men_collection.png" 
-              alt="Men's Collection" 
-              fill
-              sizes="(max-width: 768px) 100vw, 33vw"
-              className="object-cover transition-transform duration-700 group-hover:scale-[1.03]" 
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent opacity-80" />
-            <div className="absolute inset-x-0 bottom-0 p-10 flex flex-col items-center justify-end h-full text-center">
-              <h3 className="font-sans text-4xl md:text-5xl font-semibold text-white mb-6 tracking-normal">MEN</h3>
-              <span className="rounded-md bg-white px-8 py-3.5 text-sm font-medium text-ink shadow-lg transform translate-y-4 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
-                See details
-              </span>
-            </div>
-          </Link>
-          
-          <Link href="/browse?category=women" className="group relative aspect-[4/5] overflow-hidden rounded-xl block shadow-sm hover:shadow-md transition-shadow">
-            <Image 
-              src="/women_collection.png" 
-              alt="Women's Collection" 
-              fill
-              sizes="(max-width: 768px) 100vw, 33vw"
-              className="object-cover transition-transform duration-700 group-hover:scale-[1.03]" 
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent opacity-80" />
-            <div className="absolute inset-x-0 bottom-0 p-10 flex flex-col items-center justify-end h-full text-center">
-              <h3 className="font-sans text-4xl md:text-5xl font-semibold text-white mb-6 tracking-normal">WOMEN</h3>
-              <span className="rounded-md bg-white px-8 py-3.5 text-sm font-medium text-ink shadow-lg transform translate-y-4 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
-                See details
-              </span>
-            </div>
-          </Link>
-
-          <Link href="/browse?category=accessories" className="group relative aspect-[4/5] overflow-hidden rounded-xl block shadow-sm hover:shadow-md transition-shadow">
-            <Image 
-              src="/accessories_collection.png" 
-              alt="Accessories Collection" 
-              fill
-              sizes="(max-width: 768px) 100vw, 33vw"
-              className="object-cover transition-transform duration-700 group-hover:scale-[1.03]" 
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent opacity-80" />
-            <div className="absolute inset-x-0 bottom-0 p-10 flex flex-col items-center justify-end h-full text-center">
-              <h3 className="font-sans text-4xl md:text-5xl font-semibold text-white mb-6 tracking-normal">ACCESSORIES</h3>
-              <span className="rounded-md bg-white px-8 py-3.5 text-sm font-medium text-ink shadow-lg transform translate-y-4 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
-                See details
-              </span>
-            </div>
-          </Link>
+        <div className="grid gap-8 md:grid-cols-3">
+          <CollectionCard href="/browse?category=men" src="/men_collection.png" title="MEN" />
+          <CollectionCard href="/browse?category=women" src="/women_collection.png" title="WOMEN" />
+          <CollectionCard href="/browse?category=accessories" src="/accessories_collection.png" title="ACCESSORIES" />
         </div>
       </section>
 
-      {/* FINAL CTA */}
       <section className="container-edit pb-24">
-        <div className="border border-ink p-10 md:p-16 text-center rounded-xl">
+        <div className="rounded-xl border border-ink p-10 text-center md:p-16">
           <p className="eyebrow">Join the waitlist for new pincodes</p>
-          <h2 className="font-display text-4xl md:text-6xl mt-4 text-ink leading-[1.05]">
-            A wardrobe shared is<br />a wardrobe <span className="italic text-primary">multiplied.</span>
+          <h2 className="mt-4 font-display text-4xl leading-[1.05] text-ink md:text-6xl">
+            A wardrobe shared is
+            <br />
+            a wardrobe <span className="italic text-primary">multiplied.</span>
           </h2>
           <WaitlistForm />
         </div>
       </section>
     </div>
+  );
+}
+
+function CollectionCard({ href, src, title }: { href: string; src: string; title: string }) {
+  return (
+    <Link href={href} className="group relative block aspect-[4/5] overflow-hidden rounded-xl shadow-sm transition-shadow hover:shadow-md">
+      <Image
+        src={src}
+        alt={`${title} collection`}
+        fill
+        sizes="(max-width: 768px) 100vw, 33vw"
+        className="object-cover transition-transform duration-700 group-hover:scale-[1.03]"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent opacity-80" />
+      <div className="absolute inset-x-0 bottom-0 flex h-full flex-col items-center justify-end p-10 text-center">
+        <h3 className="mb-6 font-sans text-4xl font-semibold tracking-normal text-white md:text-5xl">{title}</h3>
+        <span className="translate-y-4 rounded-md bg-white px-8 py-3.5 text-sm font-medium text-ink opacity-0 shadow-lg transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
+          See details
+        </span>
+      </div>
+    </Link>
   );
 }

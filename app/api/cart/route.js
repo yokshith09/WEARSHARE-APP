@@ -8,18 +8,25 @@ export async function GET(request) {
   if (!session || !session.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   // Find or create cart
-  let { data: cart } = await supabaseAdmin
+  let { data: cart, error: cartLookupError } = await supabaseAdmin
     .from('carts')
     .select('id')
     .eq('user_id', session.user.id)
-    .single()
+    .maybeSingle()
+
+  if (cartLookupError) {
+    return NextResponse.json({ error: cartLookupError.message }, { status: 500 })
+  }
 
   if (!cart) {
-    const { data: newCart } = await supabaseAdmin
+    const { data: newCart, error: createCartError } = await supabaseAdmin
       .from('carts')
       .insert({ user_id: session.user.id })
       .select('id')
       .single()
+    if (createCartError) {
+      return NextResponse.json({ error: createCartError.message }, { status: 500 })
+    }
     cart = newCart
   }
 
@@ -39,7 +46,8 @@ export async function GET(request) {
         security_deposit,
         size,
         category,
-        owner_id
+        owner_id,
+        image_url
       )
     `)
     .eq('cart_id', cart.id)
@@ -49,6 +57,7 @@ export async function GET(request) {
     name: item.listings?.title,
     rentalPricePerDay: item.listings?.rental_price_per_day,
     securityDeposit: item.listings?.security_deposit,
+    imageUrl: item.listings?.image_url,
     size: item.listings?.size,
     category: item.listings?.category,
     days: item.days,
@@ -79,18 +88,25 @@ export async function POST(request) {
   }
 
   // Find or create cart
-  let { data: cart } = await supabaseAdmin
+  let { data: cart, error: cartLookupError } = await supabaseAdmin
     .from('carts')
     .select('id')
     .eq('user_id', session.user.id)
-    .single()
+    .maybeSingle()
+
+  if (cartLookupError) {
+    return NextResponse.json({ error: cartLookupError.message }, { status: 500 })
+  }
 
   if (!cart) {
-    const { data: newCart } = await supabaseAdmin
+    const { data: newCart, error: createCartError } = await supabaseAdmin
       .from('carts')
       .insert({ user_id: session.user.id })
       .select('id')
       .single()
+    if (createCartError) {
+      return NextResponse.json({ error: createCartError.message }, { status: 500 })
+    }
     cart = newCart
   }
 
@@ -124,7 +140,7 @@ export async function DELETE(request) {
     .from('carts')
     .select('id')
     .eq('user_id', session.user.id)
-    .single()
+    .maybeSingle()
 
   if (cart && listingId) {
     await supabaseAdmin
