@@ -23,6 +23,7 @@ export default function ListingDetail() {
   const [range, setRange] = useState<DateRange | undefined>();
   const [addingToCart, setAddingToCart] = useState(false);
   const [cartError, setCartError] = useState("");
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   const days = useMemo(() => {
     if (range?.from && range?.to) return Math.max(1, differenceInCalendarDays(range.to, range.from) + 1);
@@ -72,7 +73,7 @@ export default function ListingDetail() {
   }
 
   const isVerified = listing.ownerId?.isVerified || listing.verified;
-  const image = listing.imageUrl || listing.imageData || listing.image;
+  const image = listing.imageUrl || listing.imageData || listing.image || "/placeholder.jpg";
   const title = listing.name || listing.title;
   const price = listing.rentalPricePerDay || listing.pricePerDay;
   const rating = listing.ownerId?.rating || listing.rating || 4.5;
@@ -83,6 +84,13 @@ export default function ListingDetail() {
   const listerInitial = listerName.charAt(0);
   const deposit = listing.securityDeposit || listing.deposit || 0;
   const retailPrice = listing.buyPrice || listing.retailPrice || (price * 20);
+  const listingId = listing._id || listing.id;
+  const galleryImages = Array.from(new Set([
+    ...(Array.isArray(listing.photoUrls) ? listing.photoUrls : []),
+    ...(Array.isArray(listing.photos) ? listing.photos : []),
+    image,
+  ].filter(Boolean)));
+  const activeImage = selectedImage && galleryImages.includes(selectedImage) ? selectedImage : galleryImages[0] || image;
   
   const subtotal = days * price;
   const protectionFee = Math.round(subtotal * 0.05);
@@ -128,23 +136,30 @@ export default function ListingDetail() {
         </Link>
       </div>
 
-      <section className="container-edit pt-6 pb-16 grid md:grid-cols-12 gap-10 md:gap-16">
+      <section className="container-edit pt-6 pb-16 grid lg:grid-cols-[minmax(0,0.95fr)_minmax(360px,0.65fr)] gap-8 lg:gap-14">
         {/* Gallery */}
-        <div className="md:col-span-7">
-          <div className="aspect-[4/5] overflow-hidden bg-muted rounded-2xl shadow-xl border border-border">
-            <img src={image} alt={title} className="h-full w-full object-cover" />
+        <div className="min-w-0">
+          <div className="aspect-[4/5] lg:aspect-[5/6] max-h-[720px] overflow-hidden bg-muted rounded-xl shadow-xl border border-border">
+            <img src={activeImage} alt={title} className="h-full w-full object-cover object-top" />
           </div>
-          <div className="grid grid-cols-4 gap-3 mt-4">
-            {[image, image, image, image].map((src, i) => (
-              <button key={i} className={`aspect-square overflow-hidden rounded-xl shadow-sm ${i === 0 ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : "opacity-60 hover:opacity-100 transition-opacity"}`}>
-                <img src={src} alt="" className="h-full w-full object-cover" />
-              </button>
-            ))}
-          </div>
+          {galleryImages.length > 1 && (
+            <div className="grid grid-cols-4 gap-3 mt-4">
+              {galleryImages.slice(0, 4).map((src, i) => (
+                <button
+                  key={src}
+                  onClick={() => setSelectedImage(src)}
+                  className={`aspect-square overflow-hidden rounded-xl shadow-sm transition ${activeImage === src ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : "opacity-70 hover:opacity-100"}`}
+                  aria-label={`View photo ${i + 1}`}
+                >
+                  <img src={src} alt="" className="h-full w-full object-cover object-top" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Info / Booking */}
-        <div className="md:col-span-5 md:sticky md:top-28 md:self-start">
+        <div className="lg:sticky lg:top-28 lg:self-start min-w-0">
           <p className="eyebrow">{listing.occasion} / {category}</p>
           <h1 className="font-display text-4xl md:text-5xl mt-3 text-ink leading-tight">{title}</h1>
 
@@ -275,10 +290,10 @@ export default function ListingDetail() {
           )}
           {cartError && <p className="mt-3 text-sm text-red-600">{cartError}</p>}
           <Link
-            href={`/trips/${listing._id || listing.id}`}
+            href={`/trips/${listingId}?from=listing`}
             className="mt-2 w-full border border-ink text-ink rounded-xl py-3.5 text-sm font-medium hover:bg-ink hover:text-cream transition-colors flex items-center justify-center gap-2"
           >
-            <MessageCircle className="h-4 w-4" /> Message {listerName.split(" ")[0]} first
+            <MessageCircle className="h-4 w-4" /> Message {listerName.split(" ")[0]}
           </Link>
 
           <p className="mt-3 text-[11px] text-muted-foreground text-center">

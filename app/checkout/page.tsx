@@ -11,6 +11,7 @@ export default function CheckoutPage() {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const [paymentError, setPaymentError] = useState("");
   const router = useRouter();
 
   useEffect(() => {
@@ -39,6 +40,7 @@ export default function CheckoutPage() {
   const handlePayment = async () => {
     if (items.length === 0) return;
     setProcessing(true);
+    setPaymentError("");
     trackEvent("booking_started", {
       items: items.length,
       subtotal,
@@ -54,9 +56,18 @@ export default function CheckoutPage() {
 
       const orderData = await res.json();
 
-      if (orderData.error) {
-        alert(orderData.error);
-        setProcessing(false);
+      if (!res.ok || orderData.error) {
+        setPaymentError(orderData.error || "Unable to start payment. Please try again.");
+        return;
+      }
+
+      if (!orderData.keyId) {
+        setPaymentError("Payment gateway is not configured yet. Please contact WearShare support.");
+        return;
+      }
+
+      if (!(window as any).Razorpay) {
+        setPaymentError("Payment checkout is still loading. Please try again in a moment.");
         return;
       }
 
@@ -87,7 +98,7 @@ export default function CheckoutPage() {
             });
             router.push("/dashboard/renter?checkout=success");
           } else {
-            alert("Payment verification failed. Please contact support.");
+            setPaymentError("Payment verification failed. Please contact support.");
           }
         },
         prefill: {
@@ -99,7 +110,7 @@ export default function CheckoutPage() {
         },
         modal: {
           ondismiss: function () {
-            alert("Payment was cancelled.");
+            setPaymentError("Payment was cancelled before completion.");
           },
         },
       };
@@ -107,12 +118,12 @@ export default function CheckoutPage() {
       const rzp = new (window as any).Razorpay(options);
       rzp.on("payment.failed", function (response: any) {
         const reason = response?.error?.description || "Payment failed. Please try again.";
-        alert(reason);
+        setPaymentError(reason);
       });
       rzp.open();
     } catch (err) {
       console.error(err);
-      alert("Something went wrong. Please try again.");
+      setPaymentError("Something went wrong. Please try again.");
     } finally {
       setProcessing(false);
     }
@@ -192,7 +203,12 @@ export default function CheckoutPage() {
                   <span>₹{total.toLocaleString("en-IN")}</span>
                 </div>
               </div>
-              
+              {paymentError && (
+                <div className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {paymentError}
+                </div>
+              )}
+
               <button 
                 onClick={handlePayment}
                 disabled={processing || items.length === 0}

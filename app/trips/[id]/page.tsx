@@ -43,6 +43,7 @@ export default function TripPage() {
   const role = searchParams.get("role") === "lister" ? "lister" : "renter";
   const fallbackListing = useMemo(() => getListing(id), [id]);
   const [bookingListing, setBookingListing] = useState<any>(null);
+  const [checkingListing, setCheckingListing] = useState(!fallbackListing);
   const listing = bookingListing || fallbackListing;
 
   const [current, setCurrent] = useState<Stage>("approved");
@@ -66,12 +67,34 @@ export default function TripPage() {
   const chatPhotoRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (fallbackListing) return;
+    if (fallbackListing) {
+      setCheckingListing(false);
+      return;
+    }
+    setCheckingListing(true);
     fetch("/api/bookings")
       .then((res) => res.json())
-      .then((data) => {
+      .then(async (data) => {
         const booking = [...(data.rentals || []), ...(data.lending || [])].find((item: any) => item.id === id);
-        if (!booking) return;
+        if (!booking) {
+          const listingRes = await fetch(`/api/listings/${id}`);
+          if (!listingRes.ok) return;
+          const listingData = await listingRes.json();
+          if (listingData.error) return;
+          setCurrent("requested");
+          setBookingListing({
+            id: listingData.id || listingData._id,
+            title: listingData.title || listingData.name,
+            lister: listingData.ownerId?.name || listingData.ownerName || listingData.lister || "Lister",
+            area: listingData.area || "Shared pickup point",
+            city: listingData.city || "WearShare",
+            pricePerDay: listingData.rentalPricePerDay || listingData.pricePerDay || 0,
+            deposit: listingData.securityDeposit || listingData.deposit || 0,
+            image: listingData.imageUrl || listingData.image || "/placeholder.jpg",
+            preBooking: true,
+          });
+          return;
+        }
         setCurrent((booking.status || "approved") as Stage);
         setBookingListing({
           id: booking.listingId || booking.id,
@@ -84,13 +107,23 @@ export default function TripPage() {
           image: booking.listingImage || "/placeholder.jpg",
         });
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setCheckingListing(false));
   }, [fallbackListing, id, role]);
 
   useEffect(() => {
     if (!listing) return;
+    const preBooking = Boolean(listing.preBooking);
     setMessages([
-      { id: "m1", from: "lister", kind: "text", time: "10:24 AM", text: `Hi! Booking confirmed. Pickup is at my place in ${listing.area || ""} - anytime between 6-9pm Friday works.` },
+      {
+        id: "m1",
+        from: preBooking ? "me" : "lister",
+        kind: "text",
+        time: "10:24 AM",
+        text: preBooking
+          ? `Hi! I'm interested in ${listing.title}. Is it available for my dates?`
+          : `Hi! Booking confirmed. Pickup is at my place in ${listing.area || ""} - anytime between 6-9pm Friday works.`,
+      },
       {
         id: "m2",
         from: "lister",
@@ -100,11 +133,16 @@ export default function TripPage() {
         address: `2nd Floor, 12th Main, ${listing.area || ""}, ${listing.city || ""} 560038`,
         window: "Friday / 6:00 - 9:00 PM",
       },
-      { id: "m3", from: "me", kind: "text", time: "10:31 AM", text: "Perfect, I'll come around 7pm. Should I bring an ID?" },
-      { id: "m4", from: "lister", kind: "text", time: "10:33 AM", text: "Yes please, just for verification at handover. I'll have it steam-pressed and bagged." },
+      ...(preBooking
+        ? [{ id: "m3", from: "lister" as const, kind: "text" as const, time: "10:25 AM", text: "Yes, message me your preferred pickup and return dates." }]
+        : [
+            { id: "m3", from: "me" as const, kind: "text" as const, time: "10:31 AM", text: "Perfect, I'll come around 7pm. Should I bring an ID?" },
+            { id: "m4", from: "lister" as const, kind: "text" as const, time: "10:33 AM", text: "Yes please, just for verification at handover. I'll have it steam-pressed and bagged." },
+          ]),
     ]);
   }, [listing]);
 
+  if (checkingListing) return <div className="p-20 text-center text-muted-foreground">Opening conversation...</div>;
   if (!listing) return <div className="p-20 text-center">Not found</div>;
 
   const send = () => {
@@ -139,6 +177,7 @@ export default function TripPage() {
   const idx = stages.findIndex((s) => s.id === current);
   const bothPickupConfirmed = pickupConfirmedBy.me && pickupConfirmedBy.lister;
   const bothReturnConfirmed = returnConfirmedBy.me && returnConfirmedBy.lister;
+  const isPreBooking = Boolean(listing.preBooking);
 
   const onPickupConfirm = () => {
     const next = role === "lister"
@@ -167,14 +206,16 @@ export default function TripPage() {
       <section className="container-edit pt-6 pb-20">
         <div className="flex items-end justify-between gap-4 flex-wrap">
           <div>
-            <p className="eyebrow">Trip / #WS-{String(listing.id).slice(0, 6).toUpperCase()} / {role}</p>
+            <p className="eyebrow">{isPreBooking ? "Conversation" : "Trip"} / #WS-{String(listing.id).slice(0, 6).toUpperCase()} / {role}</p>
             <h1 className="font-display text-4xl md:text-5xl mt-3 text-ink leading-tight">{listing.title}</h1>
             <p className="mt-2 text-sm text-muted-foreground">with {listing.lister} / {listing.area}, {listing.city}</p>
           </div>
           <div className="text-right">
-            <p className="eyebrow">Total paid</p>
-            <p className="font-display text-2xl text-ink mt-1">{inr(listing.pricePerDay * 2 + Math.round(listing.pricePerDay * 0.13))}</p>
-            <p className="text-[11px] text-muted-foreground">+ {inr(listing.deposit)} held as deposit</p>
+            <p className="eyebrow">{isPreBooking ? "Rental price" : "Total paid"}</p>
+            <p className="font-display text-2xl text-ink mt-1">
+              {isPreBooking ? `${inr(listing.pricePerDay)}/day` : inr(listing.pricePerDay * 2 + Math.round(listing.pricePerDay * 0.13))}
+            </p>
+            <p className="text-[11px] text-muted-foreground">{isPreBooking ? `${inr(listing.deposit)} refundable deposit` : `+ ${inr(listing.deposit)} held as deposit`}</p>
           </div>
         </div>
 

@@ -73,9 +73,16 @@ export async function POST(request) {
     const totalAmount = subtotal + deposit + platformFee
     const listerEarnings = Math.round(subtotal * 0.85) // 85% goes to Lister
 
+    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+      return NextResponse.json(
+        { error: 'Razorpay is not configured. Add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET before accepting payments.' },
+        { status: 503 }
+      )
+    }
+
     const razorpay = new Razorpay({
-      key_id: process.env.RAZORPAY_KEY_ID || '',
-      key_secret: process.env.RAZORPAY_KEY_SECRET || ''
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET
     })
 
     const lockItems = []
