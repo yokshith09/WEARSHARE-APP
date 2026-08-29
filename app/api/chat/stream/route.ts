@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { getGeminiModel } from "@/lib/gemini";
+import { createGroqStream, isGroqConfigured } from "@/lib/groq";
 import { apiLimiter, dailyLimiter } from "@/lib/rate-limit";
 import {
   loadChatHistory,
@@ -24,7 +25,7 @@ export async function POST(req: NextRequest) {
 
   try {
     await apiLimiter.check(perMinuteLimit, `chat-stream:${actorKey}`);
-    await dailyLimiter.check(dailyLimit, `gemini-chat-stream:${actorKey}`);
+    await dailyLimiter.check(dailyLimit, `chat-stream-daily:${actorKey}`);
   } catch {
     return new Response(JSON.stringify({ error: "Chat limit reached. Please try again later." }), {
       status: 429,
@@ -40,12 +41,19 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const model = getGeminiModel();
-  if (!model) {
-    return new Response(JSON.stringify({ error: "GEMINI_API_KEY is not configured" }), {
-      status: 503,
-      headers: { "Content-Type": "application/json" },
-    });
+  const useGroq = isGroqConfigured();
+  const geminiModel = !useGroq ? getGeminiModel() : null;
+
+  if (!useGroq && !geminiModel) {
+    return new Response(
+      JSON.stringify({
+        error: "Wren is not configured yet. Add GROQ_API_KEY or GEMINI_API_KEY to enable live replies.",
+      }),
+      {
+        status: 503,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
   }
 
   const cleanMessage = String(message).slice(0, 1200);
@@ -63,40 +71,73 @@ export async function POST(req: NextRequest) {
       const encoder = new TextEncoder();
       let fullResponse = "";
 
+      if (listings.length) {
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify({ type: "listings", data: listings })}\n\n`)
+        );
+      }
+
       try {
-        const chat = model.startChat({
-          history: history.slice(-10),
-          systemInstruction: {
-            role: "user",
-            parts: [{ text: wearshareSystemPrompt(listings) }],
-          },
-        });
+        if (useGroq) {
+          // Format messages for Groq API (OpenAI compatible)
+          const groqMessages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
+            { role: "system", content: wearshareSystemPrompt(listings) },
+            ...history.map((h: any) => ({
+              role: (h.role === "model" ? "assistant" : "user") as "assistant" | "user",
+              content: h.parts?.[0]?.text || "",
+            })),
+            { role: "user", content: cleanMessage },
+          ];
 
-        const streamResult = await chat.sendMessageStream(cleanMessage);
+          const groqStream = await createGroqStream({
+            messages: groqMessages,
+          });
 
-        if (listings.length) {
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ type: "listings", data: listings })}\n\n`)
-          );
-        }
+          if (groqStream) {
+            for await (const chunk of groqStream) {
+              const delta = chunk.choices[0]?.delta?.content || "";
+              if (!delta) continue;
+              fullResponse += delta;
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ type: "token", data: delta })}\n\n`)
+              );
+            }
+          }
+        } else if (geminiModel) {
+          const chat = geminiModel.startChat({
+            history: history.slice(-10),
+            systemInstruction: {
+              role: "user",
+              parts: [{ text: wearshareSystemPrompt(listings) }],
+            },
+          });
 
-        for await (const chunk of streamResult.stream) {
-          const text = chunk.text();
-          if (!text) continue;
-          fullResponse += text;
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ type: "token", data: text })}\n\n`)
-          );
+          const streamResult = await chat.sendMessageStream(cleanMessage);
+
+          for await (const chunk of streamResult.stream) {
+            const text = chunk.text();
+            if (!text) continue;
+            fullResponse += text;
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ type: "token", data: text })}\n\n`)
+            );
+          }
         }
 
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "done" })}\n\n`));
         await saveChatMessage(sessionId, "assistant", fullResponse, userId);
       } catch (error: any) {
+        console.error("[Chat Stream Error]", error);
+        const errText =
+          String(error?.message || "").toLowerCase().includes("503") ||
+          String(error?.message || "").toLowerCase().includes("rate limit")
+            ? "Wren is busy right now. Please try again in a minute."
+            : error?.message || "Unable to stream reply";
         controller.enqueue(
           encoder.encode(
             `data: ${JSON.stringify({
               type: "error",
-              data: error?.message || "Unable to stream reply",
+              data: errText,
             })}\n\n`
           )
         );
@@ -115,3 +156,4 @@ export async function POST(req: NextRequest) {
     },
   });
 }
+

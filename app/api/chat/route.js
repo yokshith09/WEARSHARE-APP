@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/authOptions"
 import { getGeminiModel } from "@/lib/gemini"
+import { generateGroqCompletion, isGroqConfigured } from "@/lib/groq"
 import { apiLimiter, dailyLimiter } from "@/lib/rate-limit"
 import {
   loadChatHistory,
@@ -21,7 +22,7 @@ export async function POST(request) {
 
   try {
     await apiLimiter.check(perMinuteLimit, `chat:${actorKey}`)
-    await dailyLimiter.check(dailyLimit, `gemini-chat:${actorKey}`)
+    await dailyLimiter.check(dailyLimit, `chat-daily:${actorKey}`)
   } catch {
     return NextResponse.json({ error: "Chat limit reached. Please try again later." }, { status: 429 })
   }
@@ -32,10 +33,12 @@ export async function POST(request) {
       return NextResponse.json({ error: "Message is required" }, { status: 400 })
     }
 
-    const model = getGeminiModel()
-    if (!model) {
+    const useGroq = isGroqConfigured()
+    const geminiModel = !useGroq ? getGeminiModel() : null
+
+    if (!useGroq && !geminiModel) {
       return NextResponse.json({
-        reply: "I can help with rentals, deposits, returns, and sizing once Gemini is configured. Add GEMINI_API_KEY to enable live answers.",
+        reply: "Wren is not configured yet. Add GROQ_API_KEY or GEMINI_API_KEY to enable live replies, and you can still browse outfits while that is being set up.",
       })
     }
 
@@ -47,16 +50,44 @@ export async function POST(request) {
 
     await saveChatMessage(sessionId, "user", cleanMessage, userId)
 
-    const chat = model.startChat({
-      history: history.slice(-10),
-      systemInstruction: {
-        role: "user",
-        parts: [{ text: wearshareSystemPrompt(listings) }],
-      },
-    })
+    let reply = ""
 
-    const result = await chat.sendMessage(cleanMessage)
-    const reply = result.response.text().trim()
+    if (useGroq) {
+      const groqMessages = [
+        { role: "system", content: wearshareSystemPrompt(listings) },
+        ...history.map((h) => ({
+          role: h.role === "model" ? "assistant" : "user",
+          content: h.parts?.[0]?.text || "",
+        })),
+        { role: "user", content: cleanMessage },
+      ]
+
+      const groqReply = await generateGroqCompletion({ messages: groqMessages })
+      reply = groqReply || "I am here to help you rent and list premium fashion across Bengaluru."
+    } else if (geminiModel) {
+      const chat = geminiModel.startChat({
+        history: history.slice(-10),
+        systemInstruction: {
+          role: "user",
+          parts: [{ text: wearshareSystemPrompt(listings) }],
+        },
+      })
+
+      try {
+        const result = await chat.sendMessage(cleanMessage)
+        reply = result.response.text().trim()
+      } catch (error) {
+        const errMsg = String(error?.message || "").toLowerCase()
+        if (errMsg.includes("503") || errMsg.includes("high demand") || errMsg.includes("rate limit")) {
+          return NextResponse.json({
+            reply: "Wren is busy right now, so live AI replies are temporarily unavailable. Please try again in a minute, or browse outfits directly.",
+            usedRAG: listings.length > 0,
+            listings,
+          })
+        }
+        throw error
+      }
+    }
 
     await saveChatMessage(sessionId, "assistant", reply, userId)
 
@@ -66,7 +97,8 @@ export async function POST(request) {
       listings,
     })
   } catch (error) {
-    console.error(error)
+    console.error("[Chat Route Error]", error)
     return NextResponse.json({ error: "Unable to answer right now" }, { status: 500 })
   }
 }
+

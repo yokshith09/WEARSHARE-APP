@@ -145,10 +145,24 @@ export default function TripPage() {
   if (checkingListing) return <div className="p-20 text-center text-muted-foreground">Opening conversation...</div>;
   if (!listing) return <div className="p-20 text-center">Not found</div>;
 
-  const send = () => {
+  const send = async () => {
     if (!draft.trim()) return;
-    setMessages((m) => [...m, { id: `m${m.length + 1}`, from: "me", kind: "text", time: "now", text: draft }]);
+    const textToSend = draft.trim();
     setDraft("");
+    setMessages((m) => [...m, { id: `m${m.length + 1}`, from: "me", kind: "text", time: "Just now", text: textToSend }]);
+
+    try {
+      await fetch(`/api/trips/${id}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content: textToSend,
+          kind: "text",
+        }),
+      });
+    } catch (e) {
+      console.error("[Trip message send error]", e);
+    }
   };
 
   const shareAddressCard = (kind: "pickup" | "return") => {

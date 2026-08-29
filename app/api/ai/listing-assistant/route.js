@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server'
 import { apiLimiter } from '@/lib/rate-limit'
 import { extractJsonObject, getGeminiModel } from '@/lib/gemini'
+import { generateGroqCompletion, isGroqConfigured } from '@/lib/groq'
 
 export async function POST(request) {
   try {
     const ip = request.headers.get("x-forwarded-for") || "unknown";
-    await apiLimiter.check(3, ip); // Rate limit to prevent abuse
+    await apiLimiter.check(10, `listing-assistant:${ip}`);
   } catch (error) {
     return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
   }
@@ -13,17 +14,36 @@ export async function POST(request) {
   try {
     const body = await request.json().catch(() => ({}))
     const imageUrls = Array.isArray(body.imageUrls) ? body.imageUrls.slice(0, 3) : []
-    const model = getGeminiModel()
 
+    const prompt = `You help WearShare listers create accurate Indian fashion rental listings.
+Based on these photo URLs and optional context, return only JSON with:
+title, category, condition, description, occasion, retailPrice, pricePerDay, deposit, tags.
+Use INR numbers. Categories must be one of Lehenga, Saree, Sherwani, Anarkali, Gown, Kurta, Suit, Indo-Western, Blazer, Tuxedo, Co-ord Set, Dhoti, Accessories, Shirt, Pant.
+Photo URLs: ${imageUrls.join(", ") || "not uploaded yet"}
+Context: ${JSON.stringify(body.context || {})}`;
+
+    if (isGroqConfigured()) {
+      try {
+        const raw = await generateGroqCompletion({
+          messages: [
+            { role: "system", content: "You are an expert Indian ethnic and designer fashion listing assistant. Output strictly JSON." },
+            { role: "user", content: prompt }
+          ],
+          jsonMode: true,
+          temperature: 0.3
+        });
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          return NextResponse.json(parsed);
+        }
+      } catch (groqErr) {
+        console.error('[AI Listing Assistant] Groq error:', groqErr);
+      }
+    }
+
+    const model = getGeminiModel()
     if (model) {
-      const result = await model.generateContent(`
-        You help WearShare listers create accurate Indian fashion rental listings.
-        Based on these photo URLs and optional context, return only JSON with:
-        title, category, condition, description, occasion, retailPrice, pricePerDay, deposit, tags.
-        Use INR numbers. Categories must be one of Lehenga, Saree, Sherwani, Anarkali, Gown, Kurta, Suit, Indo-Western, Blazer, Tuxedo, Co-ord Set, Dhoti, Accessories, Shirt, Pant.
-        Photo URLs: ${imageUrls.join(", ") || "not uploaded yet"}
-        Context: ${JSON.stringify(body.context || {})}
-      `)
+      const result = await model.generateContent(prompt)
       const parsed = extractJsonObject(result.response.text())
       if (parsed) {
         return NextResponse.json(parsed)

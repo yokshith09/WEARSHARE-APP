@@ -57,7 +57,11 @@ export function useStreamChat(sessionId: string, userId?: string) {
           signal: abortRef.current.signal,
         });
 
-        if (!res.ok || !res.body) throw new Error("Streaming request failed");
+        if (!res.ok) {
+          const payload = await res.json().catch(() => ({}));
+          throw new Error(payload?.error || "Streaming request failed");
+        }
+        if (!res.body) throw new Error("Streaming request failed");
 
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
@@ -99,7 +103,15 @@ export function useStreamChat(sessionId: string, userId?: string) {
             if (event.type === "error") {
               setMessages((prev) =>
                 prev.map((m) =>
-                  m.id === aiId ? { ...m, streaming: false, text: event.data || "Something went wrong." } : m
+                  m.id === aiId
+                    ? {
+                        ...m,
+                        streaming: false,
+                        text:
+                          event.data ||
+                          "Wren is busy right now. Please try again in a moment, or browse outfits directly.",
+                      }
+                    : m
                 )
               );
             }
@@ -110,7 +122,13 @@ export function useStreamChat(sessionId: string, userId?: string) {
           setMessages((prev) =>
             prev.map((m) =>
               m.id === aiId
-                ? { ...m, streaming: false, text: "Connection lost. Please try again." }
+                ? {
+                    ...m,
+                    streaming: false,
+                    text:
+                      error?.message ||
+                      "Wren is busy right now. Please try again in a moment, or browse outfits directly.",
+                  }
                 : m
             )
           );
@@ -130,4 +148,3 @@ export function useStreamChat(sessionId: string, userId?: string) {
 
   return { messages, isStreaming, send, stop, setMessages };
 }
-

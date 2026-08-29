@@ -42,12 +42,13 @@ Three authentication methods:
 | Application | Next.js 14 App Router |
 | UI | React 18, Tailwind CSS 4, Radix UI |
 | Authentication | NextAuth, Google OAuth, custom credential providers |
-| Database | Supabase PostgreSQL |
+| Database & Vectors | Supabase PostgreSQL + pgvector |
 | Payments | Razorpay |
 | Email | Resend or SMTP/Nodemailer |
 | Session and locks | Upstash Redis |
 | Image storage | Cloudflare R2 |
-| AI | Google Gemini and optional external providers |
+| AI Assistant & RAG | Groq (`llama-3.3-70b-versatile`) / Google Gemini (`gemini-2.5-flash`), pgvector search |
+| Virtual Try-On | Replicate (`cuuupid/idm-vton`) |
 | Monitoring | Sentry |
 | Analytics | PostHog |
 
@@ -59,6 +60,7 @@ Three authentication methods:
 - npm
 - A Supabase project
 - Resend or SMTP credentials for email OTP and password recovery
+- Groq or Google Gemini API key for AI assistant features
 - Google and Razorpay credentials when testing those integrations
 
 ### Installation
@@ -81,7 +83,17 @@ On macOS or Linux:
 cp .env.example .env.local
 ```
 
-Apply `supabase_safe_apply.sql` in the Supabase SQL Editor.
+### Database Setup
+
+Apply the schema in your Supabase SQL Editor:
+- [`supabase/schema.sql`](supabase/schema.sql) for the canonical database setup used by the app
+- `supabase_safe_apply.sql` if you are following the older local setup script
+
+This initializes:
+- `users`, `listings`, `bookings`, `claims`, and `trip_messages` tables
+- `pgvector` extension and `listing_embeddings` with 768-dimension indexing
+- Stored procedure `match_listings` for RAG similarity matching
+- Auth OTP, reset token, cart, and wishlist tables
 
 Start the development server:
 
