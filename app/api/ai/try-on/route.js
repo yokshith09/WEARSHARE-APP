@@ -3,14 +3,18 @@ import Replicate from 'replicate';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
 
-const replicate = new Replicate({
-  auth: process.env.REPLICATE_API_TOKEN,
-});
-
 export async function POST(req) {
   try {
     const session = await getServerSession(authOptions);
     if (!session || !session.user) return NextResponse.json({ error: 'Unauthorized. Please login to use AI Try-On.' }, { status: 401 });
+
+    if (!process.env.REPLICATE_API_TOKEN) {
+      return NextResponse.json({ error: 'Virtual Try-On is not configured. REPLICATE_API_TOKEN is required.' }, { status: 503 });
+    }
+
+    const replicate = new Replicate({
+      auth: process.env.REPLICATE_API_TOKEN,
+    });
 
     const { personImage, garmentImage, category = 'Upper-body' } = await req.json();
 

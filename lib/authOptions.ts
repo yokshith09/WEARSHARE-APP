@@ -250,10 +250,12 @@ export const authOptions: NextAuthOptions = {
       }
     })
   ],
-  adapter: SupabaseAdapter({
-    url: process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-    secret: process.env.SUPABASE_SERVICE_ROLE_KEY || "",
-  }) as any, // Cast to any to avoid complex TS types with SupabaseAdapter if it mismatch
+  adapter: (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY)
+    ? (SupabaseAdapter({
+        url: process.env.NEXT_PUBLIC_SUPABASE_URL,
+        secret: process.env.SUPABASE_SERVICE_ROLE_KEY,
+      }) as any)
+    : undefined,
   session: {
     strategy: "jwt",
     maxAge: SESSION_MAX_AGE_SECONDS,
