@@ -4,7 +4,7 @@ import { Suspense, useMemo, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, KeyRound, Mail, MessageSquare } from "lucide-react";
+import { ArrowRight, KeyRound, Mail, MessageSquare, User } from "lucide-react";
 
 type AuthMethod = "password" | "email-otp";
 type PasswordMode = "login" | "register";
@@ -28,41 +28,77 @@ function LoginContent() {
 
   const [authMethod, setAuthMethod] = useState<AuthMethod>("password");
   const [passwordMode, setPasswordMode] = useState<PasswordMode>("login");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(initialError);
+  const [successMsg, setSuccessMsg] = useState("");
 
   const normalizedEmail = email.trim().toLowerCase();
 
   const handlePasswordAuth = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!normalizedEmail || password.length < 8) {
-      setError("Enter an email and a password with at least 8 characters.");
+      setError("Please enter a valid email and a password with at least 8 characters.");
       return;
     }
 
     setLoading(true);
     setError("");
-    const result = await signIn("email-password", {
-      email: normalizedEmail,
-      password,
-      mode: passwordMode,
-      callbackUrl,
-      redirect: false,
-    });
-    setLoading(false);
+    setSuccessMsg("");
 
-    if (result?.error) {
-      setError(passwordMode === "register"
-        ? "Could not create this account. It may already exist."
-        : "Invalid email or password.");
-      return;
+    try {
+      if (passwordMode === "register") {
+        // Direct registration endpoint for rich, accurate error feedback
+        const regRes = await fetch("/api/auth/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: name.trim() || normalizedEmail.split("@")[0],
+            email: normalizedEmail,
+            password,
+          }),
+        });
+
+        const regData = await regRes.json().catch(() => ({}));
+
+        if (!regRes.ok || regData.error) {
+          setError(regData.error || "Could not create your account. Please try again.");
+          setLoading(false);
+          return;
+        }
+
+        setSuccessMsg("Account created! Signing you in...");
+      }
+
+      // Sign in with credentials
+      const result = await signIn("email-password", {
+        email: normalizedEmail,
+        password,
+        name: name.trim() || normalizedEmail.split("@")[0],
+        mode: "login",
+        callbackUrl,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        setError(
+          passwordMode === "register"
+            ? "Account was created, but automatic sign-in failed. Please click 'Sign in' below."
+            : "Invalid email or password. If you haven't created an account yet, click 'Create account'."
+        );
+        setLoading(false);
+        return;
+      }
+
+      window.location.href = result?.url || callbackUrl;
+    } catch (err: any) {
+      setError(err?.message || "An unexpected error occurred. Please try again.");
+      setLoading(false);
     }
-
-    window.location.href = result?.url || callbackUrl;
   };
 
   const handleSendEmailOtp = async (event?: React.SyntheticEvent) => {
@@ -129,22 +165,46 @@ function LoginContent() {
             </div>
 
             {error && (
-              <div className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {error}
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                <p className="font-medium">{error}</p>
+                {passwordMode === "register" && error.includes("already exists") && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPasswordMode("login");
+                      setError("");
+                    }}
+                    className="mt-2 text-xs font-semibold text-primary underline"
+                  >
+                    Switch to Sign in
+                  </button>
+                )}
+              </div>
+            )}
+
+            {successMsg && (
+              <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+                {successMsg}
               </div>
             )}
 
             <div className="grid grid-cols-2 gap-2 rounded-xl bg-secondary p-1">
               <button
                 type="button"
-                onClick={() => setAuthMethod("password")}
+                onClick={() => {
+                  setAuthMethod("password");
+                  setError("");
+                }}
                 className={`rounded-lg py-2 text-xs font-medium transition-colors ${authMethod === "password" ? "bg-background text-ink shadow-sm" : "text-muted-foreground"}`}
               >
                 Password
               </button>
               <button
                 type="button"
-                onClick={() => setAuthMethod("email-otp")}
+                onClick={() => {
+                  setAuthMethod("email-otp");
+                  setError("");
+                }}
                 className={`rounded-lg py-2 text-xs font-medium transition-colors ${authMethod === "email-otp" ? "bg-background text-ink shadow-sm" : "text-muted-foreground"}`}
               >
                 Email OTP
@@ -156,19 +216,38 @@ function LoginContent() {
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    onClick={() => setPasswordMode("login")}
+                    onClick={() => {
+                      setPasswordMode("login");
+                      setError("");
+                    }}
                     className={`rounded-lg border px-3 py-2 text-xs font-medium ${passwordMode === "login" ? "border-ink bg-ink text-cream" : "border-border text-ink"}`}
                   >
                     Sign in
                   </button>
                   <button
                     type="button"
-                    onClick={() => setPasswordMode("register")}
+                    onClick={() => {
+                      setPasswordMode("register");
+                      setError("");
+                    }}
                     className={`rounded-lg border px-3 py-2 text-xs font-medium ${passwordMode === "register" ? "border-ink bg-ink text-cream" : "border-border text-ink"}`}
                   >
                     Create account
                   </button>
                 </div>
+
+                {passwordMode === "register" && (
+                  <Field icon={User} label="Your name">
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                      placeholder="e.g. Priya Sharma"
+                      className="w-full rounded-xl border border-border bg-background py-3 pl-10 pr-4 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary"
+                    />
+                  </Field>
+                )}
+
                 <Field icon={Mail} label="Email address">
                   <input
                     type="email"

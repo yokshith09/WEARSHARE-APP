@@ -1,6 +1,5 @@
 import { NextAuthOptions } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
-import { SupabaseAdapter } from "@next-auth/supabase-adapter"
 import { supabaseAdmin } from "@/lib/supabase"
 import { otpVerificationLimiter } from "@/lib/rate-limit"
 import { randomUUID } from "crypto"
@@ -23,11 +22,13 @@ export const authOptions: NextAuthOptions = {
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
+        name: { label: "Name", type: "text" },
         mode: { label: "Mode", type: "text" },
       },
       async authorize(credentials, request) {
         const email = String(credentials?.email || "").trim().toLowerCase()
         const password = String(credentials?.password || "")
+        const rawName = String(credentials?.name || "").trim()
         const mode = String(credentials?.mode || "login")
         const forwardedFor = request?.headers?.["x-forwarded-for"]
         const ip = Array.isArray(forwardedFor)
@@ -46,8 +47,8 @@ export const authOptions: NextAuthOptions = {
         }
 
         try {
-          await otpVerificationLimiter.check(10, `password-auth:${email}`)
-          await otpVerificationLimiter.check(30, `password-auth:ip:${ip}`)
+          await otpVerificationLimiter.check(15, `password-auth:${email}`)
+          await otpVerificationLimiter.check(45, `password-auth:ip:${ip}`)
         } catch {
           await recordSecurityEvent({
             eventType: "auth.password.locked",
@@ -58,40 +59,67 @@ export const authOptions: NextAuthOptions = {
           return null
         }
 
-        const { data: existingUser, error } = await supabaseAdmin
+        const { data: existingUser, error: lookupError } = await supabaseAdmin
           .from("users")
           .select("id,name,email,password_hash")
           .eq("email", email)
           .maybeSingle()
 
-        if (error) return null
+        if (lookupError) {
+          console.error("[auth] supabase user lookup error:", lookupError)
+          return null
+        }
 
         if (mode === "register") {
-          if (existingUser?.password_hash) return null
+          if (existingUser?.password_hash) {
+            console.warn("[auth] user already exists with password_hash for:", email)
+            return null
+          }
 
           const userId = existingUser?.id || randomUUID()
-          const name = existingUser?.name || email.split("@")[0]
+          const userName = rawName || existingUser?.name || email.split("@")[0]
           const passwordHash = await bcrypt.hash(password, 12)
 
-          const { error: upsertError } = await supabaseAdmin
-            .from("users")
-            .upsert({
-              id: userId,
-              email,
-              name,
-              password_hash: passwordHash,
-              email_verified: new Date().toISOString(),
-              is_verified: true,
-            }, { onConflict: "id" })
+          if (existingUser) {
+            const { error: updateError } = await supabaseAdmin
+              .from("users")
+              .update({
+                name: userName,
+                password_hash: passwordHash,
+                is_verified: true,
+                email_verified: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", existingUser.id)
 
-          if (upsertError) return null
+            if (updateError) {
+              console.error("[auth] user update error:", updateError)
+              return null
+            }
+          } else {
+            const { error: insertError } = await supabaseAdmin
+              .from("users")
+              .insert({
+                id: userId,
+                email,
+                name: userName,
+                password_hash: passwordHash,
+                is_verified: true,
+                email_verified: new Date().toISOString(),
+              })
+
+            if (insertError) {
+              console.error("[auth] user insert error:", insertError)
+              return null
+            }
+          }
 
           await Promise.all([
             otpVerificationLimiter.reset(`password-auth:${email}`),
             otpVerificationLimiter.reset(`password-auth:ip:${ip}`),
           ])
 
-          return { id: userId, name, email }
+          return { id: userId, name: userName, email }
         }
 
         if (!existingUser?.password_hash) {
@@ -240,12 +268,6 @@ export const authOptions: NextAuthOptions = {
       }
     })
   ],
-  adapter: (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY)
-    ? (SupabaseAdapter({
-        url: process.env.NEXT_PUBLIC_SUPABASE_URL,
-        secret: process.env.SUPABASE_SERVICE_ROLE_KEY,
-      }) as any)
-    : undefined,
   session: {
     strategy: "jwt",
     maxAge: SESSION_MAX_AGE_SECONDS,
