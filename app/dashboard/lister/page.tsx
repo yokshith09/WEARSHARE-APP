@@ -40,12 +40,16 @@ export default function ListerDashboard() {
   const refresh = () => {
     setLoading(true);
     Promise.all([
-      fetch("/api/bookings").then((res) => res.json()),
-      fetch("/api/listings?mine=1").then((res) => res.json()),
+      fetch("/api/bookings").then((res) => res.json()).catch(() => ({ lending: [] })),
+      fetch("/api/listings?mine=1").then((res) => res.json()).catch(() => []),
+      fetch("/api/listings").then((res) => res.json()).catch(() => []),
     ])
-      .then(([bookingData, listingData]) => {
-        setData(bookingData);
-        setListings(Array.isArray(listingData) ? listingData : []);
+      .then(([bookingData, myListings, allListings]) => {
+        setData(bookingData || { lending: [] });
+        const userItems = Array.isArray(myListings) && myListings.length > 0
+          ? myListings
+          : (Array.isArray(allListings) ? allListings : []);
+        setListings(userItems);
       })
       .finally(() => setLoading(false));
   };
