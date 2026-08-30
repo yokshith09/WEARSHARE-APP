@@ -16,21 +16,26 @@ export async function POST(request) {
   const session = await getServerSession(authOptions)
   const userId = session?.user?.id || null
   const ip = request.headers.get("x-forwarded-for") || "unknown"
-  const actorKey = userId ? `user:${userId}` : `ip:${ip}`
-  const perMinuteLimit = Number(process.env.GEMINI_CHAT_PER_MINUTE_LIMIT || 10)
-  const dailyLimit = Number(process.env.GEMINI_CHAT_DAILY_LIMIT || 100)
-
-  try {
-    await apiLimiter.check(perMinuteLimit, `chat:${actorKey}`)
-    await dailyLimiter.check(dailyLimit, `chat-daily:${actorKey}`)
-  } catch {
-    return NextResponse.json({ error: "Chat limit reached. Please try again later." }, { status: 429 })
-  }
 
   try {
     const { message, sessionId = "default-session" } = await request.json()
     if (!message || String(message).trim().length < 2) {
       return NextResponse.json({ error: "Message is required" }, { status: 400 })
+    }
+
+    const actorKey = userId ? `user:${userId}` : `session:${sessionId}`
+    const perMinuteLimit = Number(process.env.GEMINI_CHAT_PER_MINUTE_LIMIT || 60)
+    const dailyLimit = Number(process.env.GEMINI_CHAT_DAILY_LIMIT || 500)
+
+    try {
+      await apiLimiter.check(perMinuteLimit, `chat:${actorKey}`)
+      await dailyLimiter.check(dailyLimit, `chat-daily:${actorKey}`)
+    } catch {
+      return NextResponse.json({
+        reply: "You're sending messages very quickly! Please wait a moment while I prepare your recommendations.",
+        usedRAG: false,
+        listings: [],
+      })
     }
 
     const useGroq = isGroqConfigured()

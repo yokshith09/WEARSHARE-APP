@@ -19,25 +19,41 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   const userId = (session?.user as any)?.id || null;
   const ip = req.headers.get("x-forwarded-for") || "unknown";
-  const actorKey = userId ? `user:${userId}` : `ip:${ip}`;
-  const perMinuteLimit = Number(process.env.GEMINI_CHAT_PER_MINUTE_LIMIT || 10);
-  const dailyLimit = Number(process.env.GEMINI_CHAT_DAILY_LIMIT || 100);
+
+  const body = await req.json().catch(() => ({}));
+  const { message, sessionId = "default-session" } = body;
+
+  if (!message || !sessionId) {
+    return new Response(JSON.stringify({ error: "message + sessionId required" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const actorKey = userId ? `user:${userId}` : `session:${sessionId}`;
+  const perMinuteLimit = Number(process.env.GEMINI_CHAT_PER_MINUTE_LIMIT || 60);
+  const dailyLimit = Number(process.env.GEMINI_CHAT_DAILY_LIMIT || 500);
 
   try {
     await apiLimiter.check(perMinuteLimit, `chat-stream:${actorKey}`);
     await dailyLimiter.check(dailyLimit, `chat-stream-daily:${actorKey}`);
   } catch {
-    return new Response(JSON.stringify({ error: "Chat limit reached. Please try again later." }), {
-      status: 429,
-      headers: { "Content-Type": "application/json" },
+    // Return friendly stream response rather than 429 crash
+    const rateMsg = "You're sending messages very quickly! Please wait a moment while I prepare your recommendations.";
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "token", data: rateMsg })}\n\n`));
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "done" })}\n\n`));
+        controller.close();
+      },
     });
-  }
-
-  const { message, sessionId = "default-session" } = await req.json();
-  if (!message || !sessionId) {
-    return new Response(JSON.stringify({ error: "message + sessionId required" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
     });
   }
 
