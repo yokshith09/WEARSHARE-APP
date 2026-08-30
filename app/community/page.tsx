@@ -1,9 +1,5 @@
 "use client";
 
-import communityImg from "@/assets/community.jpg";
-
-
-
 export default function Community() {
   return (
     <div className="bg-background">
@@ -19,7 +15,7 @@ export default function Community() {
           </p>
         </div>
         <div className="md:col-span-5 aspect-[5/4] overflow-hidden">
-          <img src={communityImg.src} alt="Community" className="h-full w-full object-cover" loading="lazy" />
+          <img src="/assets/community.jpg" alt="Community" className="h-full w-full object-cover" loading="lazy" />
         </div>
       </section>
 

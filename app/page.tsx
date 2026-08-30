@@ -1,8 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowUpRight, Sparkles, ShieldCheck, MapPin, Calendar, Star } from "lucide-react";
-import heroImg from "@/assets/hero-lehenga.jpg";
-import communityImg from "@/assets/community.jpg";
 import { listings as dummyListings, inr } from "@/lib/listings";
 import { ListingCard } from "@/components/listing-card";
 import { supabaseAdmin } from "@/lib/supabase";
@@ -161,7 +159,7 @@ export default async function Index() {
           <div className="relative order-1 md:order-2 md:col-span-5">
             <div className="relative aspect-[3/4] overflow-hidden rounded-xl">
               <Image
-                src={heroImg}
+                src="/assets/hero-lehenga.jpg"
                 alt="Editorial portrait of an Indian woman in an emerald and gold lehenga"
                 priority
                 fill
@@ -259,7 +257,7 @@ export default async function Index() {
           <div className="relative md:col-span-6">
             <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl">
               <Image
-                src={communityImg}
+                src="/assets/community.jpg"
                 alt="Friends sharing outfits in a sunlit room"
                 fill
                 sizes="(max-width: 768px) 100vw, 50vw"

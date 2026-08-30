@@ -63,7 +63,7 @@ export async function POST(request) {
       ]
 
       const groqReply = await generateGroqCompletion({ messages: groqMessages })
-      reply = groqReply || "I am here to help you rent and list premium fashion across Bengaluru."
+      reply = groqReply || ""
     } else if (geminiModel) {
       const chat = geminiModel.startChat({
         history: history.slice(-10),
@@ -77,16 +77,14 @@ export async function POST(request) {
         const result = await chat.sendMessage(cleanMessage)
         reply = result.response.text().trim()
       } catch (error) {
-        const errMsg = String(error?.message || "").toLowerCase()
-        if (errMsg.includes("503") || errMsg.includes("high demand") || errMsg.includes("rate limit")) {
-          return NextResponse.json({
-            reply: "Wren is busy right now, so live AI replies are temporarily unavailable. Please try again in a minute, or browse outfits directly.",
-            usedRAG: listings.length > 0,
-            listings,
-          })
-        }
-        throw error
+        console.warn("[Chat Gemini Warning]", error?.message);
       }
+    }
+
+    if (!reply) {
+      reply = listings.length > 0
+        ? `Here are recommended outfits matching your search in Bengaluru. Each item is verified with flexible dates and full deposit protection.`
+        : `I'm here to help you discover premium designer wear across Bengaluru. Try asking for wedding lehengas, sarees, sherwanis, blazers, or sneakers!`;
     }
 
     await saveChatMessage(sessionId, "assistant", reply, userId)

@@ -1,11 +1,3 @@
-import lehenga from "@/assets/hero-lehenga.jpg";
-import saree from "@/assets/item-saree.jpg";
-import sherwani from "@/assets/item-sherwani.jpg";
-import anarkali from "@/assets/item-anarkali.jpg";
-import cocktail from "@/assets/item-cocktail.jpg";
-import bridal from "@/assets/item-bridal.jpg";
-import kurta from "@/assets/item-kurta.jpg";
-
 export type Listing = {
   id: string;
   title: string;
@@ -51,7 +43,7 @@ export const listings: Listing[] = [
     pricePerDay: 1800,
     retailPrice: 38000,
     deposit: 6000,
-    image: (lehenga as any).src || lehenga,
+    image: "/assets/hero-lehenga.jpg",
     lister: "Deepa M.",
     area: "Indiranagar",
     city: "Bengaluru",
@@ -70,7 +62,7 @@ export const listings: Listing[] = [
     pricePerDay: 1200,
     retailPrice: 24000,
     deposit: 4000,
-    image: (saree as any).src || saree,
+    image: "/assets/item-saree.jpg",
     lister: "Lakshmi R.",
     area: "Koramangala",
     city: "Bengaluru",
@@ -89,7 +81,7 @@ export const listings: Listing[] = [
     pricePerDay: 1500,
     retailPrice: 32000,
     deposit: 5000,
-    image: (sherwani as any).src || sherwani,
+    image: "/assets/item-sherwani.jpg",
     lister: "Rahul S.",
     area: "HSR Layout",
     city: "Bengaluru",
@@ -108,7 +100,7 @@ export const listings: Listing[] = [
     pricePerDay: 950,
     retailPrice: 18500,
     deposit: 3000,
-    image: (anarkali as any).src || anarkali,
+    image: "/assets/item-anarkali.jpg",
     lister: "Priya K.",
     area: "Jayanagar",
     city: "Bengaluru",
@@ -127,7 +119,7 @@ export const listings: Listing[] = [
     pricePerDay: 850,
     retailPrice: 15000,
     deposit: 2500,
-    image: (cocktail as any).src || cocktail,
+    image: "/assets/item-cocktail.jpg",
     lister: "Anjali T.",
     area: "Whitefield",
     city: "Bengaluru",
@@ -146,7 +138,7 @@ export const listings: Listing[] = [
     pricePerDay: 2400,
     retailPrice: 52000,
     deposit: 8000,
-    image: (bridal as any).src || bridal,
+    image: "/assets/item-bridal.jpg",
     lister: "Meera J.",
     area: "Indiranagar",
     city: "Bengaluru",
@@ -165,7 +157,7 @@ export const listings: Listing[] = [
     pricePerDay: 600,
     retailPrice: 9500,
     deposit: 1500,
-    image: (kurta as any).src || kurta,
+    image: "/assets/item-kurta.jpg",
     lister: "Karan V.",
     area: "Koramangala",
     city: "Bengaluru",

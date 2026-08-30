@@ -1,5 +1,4 @@
 import { NextAuthOptions } from "next-auth"
-import GoogleProvider from "next-auth/providers/google"
 import CredentialsProvider from "next-auth/providers/credentials"
 import { SupabaseAdapter } from "@next-auth/supabase-adapter"
 import { supabaseAdmin } from "@/lib/supabase"
@@ -13,20 +12,11 @@ import { sendEmail, wearShareEmailShell } from "@/lib/resend-email"
 const SESSION_MAX_AGE_SECONDS = 30 * 24 * 60 * 60
 const SESSION_ABSOLUTE_MAX_AGE_SECONDS = 30 * 24 * 60 * 60
 const SESSION_ROTATION_SECONDS = 15 * 60
-const googleEnabled = Boolean(process.env.GOOGLE_ID && process.env.GOOGLE_SECRET)
 
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
   useSecureCookies: process.env.NODE_ENV === "production",
   providers: [
-    ...(googleEnabled
-      ? [
-          GoogleProvider({
-            clientId: process.env.GOOGLE_ID || "",
-            clientSecret: process.env.GOOGLE_SECRET || "",
-          }),
-        ]
-      : []),
     CredentialsProvider({
       id: "email-password",
       name: "Email and password",

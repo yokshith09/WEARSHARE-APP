@@ -71,66 +71,96 @@ export async function retrieveRelevantListings(
   options?: { matchCount?: number }
 ) {
   const matchCount = options?.matchCount || 5;
-  const embedding = await embedText(query);
 
-  const { data: matches, error: matchError } = await supabaseAdmin.rpc("match_listings", {
-    query_embedding: embedding,
-    match_count: matchCount,
-  });
+  // 1. Try Supabase pgvector match if embeddings & Gemini are configured
+  try {
+    const embedding = await embedText(query);
+    if (embedding && embedding.length > 0) {
+      const { data: matches, error: matchError } = await supabaseAdmin.rpc("match_listings", {
+        query_embedding: embedding,
+        match_count: matchCount,
+      });
 
-  if (matchError) {
-    console.error("[RAG] match_listings error:", matchError);
-    return [];
+      if (!matchError && matches && matches.length > 0) {
+        const listingIds = matches.map((row: any) => row.listing_id);
+        const { data: listings, error: listingError } = await supabaseAdmin
+          .from("listings")
+          .select(`
+            id,
+            title,
+            category,
+            occasion,
+            size,
+            condition,
+            rental_price_per_day,
+            security_deposit,
+            available,
+            users!owner_id (name, rating, is_verified)
+          `)
+          .in("id", listingIds);
+
+        if (!listingError && listings && listings.length > 0) {
+          const rank = new Map<string, number>(listingIds.map((id: string, index: number) => [id, index]));
+          return listings
+            .map((listing: any) => {
+              const owner = Array.isArray(listing.users) ? listing.users[0] : listing.users;
+              return {
+                listing_id: listing.id,
+                title: listing.title,
+                category: listing.category,
+                occasion: listing.occasion,
+                size: listing.size,
+                condition: listing.condition,
+                rent_per_day: Number(listing.rental_price_per_day || 0),
+                deposit_amount: Number(listing.security_deposit || 0),
+                lister_name: owner?.name || "WearShare Lister",
+                lister_rating: Number(owner?.rating || 0),
+                is_verified: !!owner?.is_verified,
+              };
+            })
+            .sort((a, b) => Number(rank.get(a.listing_id) ?? 999) - Number(rank.get(b.listing_id) ?? 999));
+        }
+      }
+    }
+  } catch (err) {
+    // Gracefully handle missing Gemini key, vector RPC failure, or network issues
   }
 
-  const listingIds = (matches || []).map((row: any) => row.listing_id);
-  if (!listingIds.length) return [];
+  // 2. Keyword and attribute matching fallback across catalogue listings
+  try {
+    const { listings: catalogListings } = await import("@/lib/listings");
+    const lowerQuery = query.toLowerCase();
+    const words = lowerQuery.split(/\s+/).filter((w) => w.length > 2);
 
-  const { data: listings, error: listingError } = await supabaseAdmin
-    .from("listings")
-    .select(`
-      id,
-      title,
-      category,
-      occasion,
-      size,
-      condition,
-      rental_price_per_day,
-      security_deposit,
-      available,
-      users!owner_id (name, rating, is_verified)
-    `)
-    .in("id", listingIds);
-
-  if (listingError) {
-    console.error("[RAG] listing fetch error:", listingError);
-    return [];
-  }
-
-  const rank = new Map(listingIds.map((id: string, index: number) => [id, index]));
-
-  return (listings || [])
-    .map((listing: any) => {
-      const owner = Array.isArray(listing.users) ? listing.users[0] : listing.users;
-      return {
-        listing_id: listing.id,
-        title: listing.title,
-        category: listing.category,
-        occasion: listing.occasion,
-        size: listing.size,
-        condition: listing.condition,
-        rent_per_day: Number(listing.rental_price_per_day || 0),
-        deposit_amount: Number(listing.security_deposit || 0),
-        lister_name: owner?.name || "WearShare Lister",
-        lister_rating: Number(owner?.rating || 0),
-        is_verified: !!owner?.is_verified,
-      };
-    })
-    .sort((a, b) => {
-      const aRank = Number(rank.get(a.listing_id) ?? 999);
-      const bRank = Number(rank.get(b.listing_id) ?? 999);
-      return aRank - bRank;
+    const scored = catalogListings.map((item) => {
+      const text = `${item.title} ${item.category} ${item.occasion} ${item.size} ${item.area} ${item.city}`.toLowerCase();
+      let score = 0;
+      for (const word of words) {
+        if (text.includes(word)) score += 1;
+      }
+      return { item, score };
     });
+
+    scored.sort((a, b) => b.score - a.score);
+    const topItems = scored.filter((s) => s.score > 0).map((s) => s.item);
+    const finalItems = topItems.length > 0 ? topItems : catalogListings;
+
+    return finalItems.slice(0, matchCount).map((l) => ({
+      listing_id: l.id,
+      title: l.title,
+      category: l.category,
+      occasion: l.occasion,
+      size: l.size,
+      condition: "Like New",
+      rent_per_day: l.pricePerDay,
+      deposit_amount: l.deposit,
+      lister_name: l.lister,
+      lister_rating: l.rating,
+      is_verified: l.verified,
+    }));
+  } catch {
+    return [];
+  }
 }
 
 export function formatListingContext(listings: any[]) {

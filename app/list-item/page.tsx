@@ -5,7 +5,6 @@ import { useState, useMemo, useRef } from "react";
 import {
   ArrowUpRight, Camera, IndianRupee, ShieldCheck, Upload, X, Sparkles, Check,
 } from "lucide-react";
-import communityImg from "@/assets/community.jpg";
 import { Calendar } from "@/components/ui/calendar";
 import { trackEvent } from "@/lib/analytics";
 
@@ -52,7 +51,7 @@ export default function ListItem() {
         </div>
         <div className="md:col-span-5">
           <div className="aspect-[4/5] overflow-hidden bg-muted">
-            <img src={communityImg.src} alt="Community lister" className="h-full w-full object-cover" loading="lazy" />
+            <img src="/assets/community.jpg" alt="Community lister" className="h-full w-full object-cover" loading="lazy" />
           </div>
         </div>
       </section>
