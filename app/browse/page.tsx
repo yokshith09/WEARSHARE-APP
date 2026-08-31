@@ -1,8 +1,7 @@
 "use client";
 
-import { Suspense } from "react";
-import { useEffect, useRef, useState, useMemo } from "react";
-import { ChevronLeft, ChevronRight, SlidersHorizontal, MapPin, CalendarIcon, X, Mic, Search } from "lucide-react";
+import { Suspense, useEffect, useRef, useState, useMemo } from "react";
+import { ChevronLeft, ChevronRight, SlidersHorizontal, MapPin, CalendarIcon, X, Mic, Search, Sparkles } from "lucide-react";
 import { format } from "date-fns";
 import { isDateBlocked } from "@/lib/listings";
 import { ListingCard } from "@/components/listing-card";
@@ -12,8 +11,21 @@ import { cn } from "@/lib/utils";
 import { useSearchParams } from "next/navigation";
 import { trackEvent } from "@/lib/analytics";
 
-const categories = ["All", "Lehenga", "Saree", "Sherwani", "Anarkali", "Gown", "Kurta", "Suit", "Indo-Western", "Blazer", "Tuxedo", "Co-ord Set", "Dhoti", "Accessories", "Shirt", "Pant"];
-const occasions = ["All", "Wedding", "Reception", "Sangeet", "Cocktail", "Festival"];
+type CollectionType = "All" | "Women" | "Men" | "Accessories";
+
+const collections: { id: CollectionType; label: string }[] = [
+  { id: "All", label: "All Outfits" },
+  { id: "Women", label: "Women" },
+  { id: "Men", label: "Men" },
+  { id: "Accessories", label: "Accessories" },
+];
+
+const allCategories = ["All", "Lehenga", "Saree", "Sherwani", "Anarkali", "Gown", "Kurta", "Suit", "Blazer", "Shirt", "Accessories"];
+const womenCategories = ["All", "Lehenga", "Saree", "Anarkali", "Gown", "Co-ord Set", "Accessories"];
+const menCategories = ["All", "Sherwani", "Kurta", "Suit", "Blazer", "Shirt", "Pant", "Accessories"];
+const accessoriesCategories = ["All", "Accessories", "Watch", "Cap", "Belt", "Trolley", "Sneakers"];
+
+const occasions = ["All", "Wedding", "Reception", "Sangeet", "Cocktail", "Festival", "Party", "Formal"];
 const sizes = ["All", "XS", "S", "M", "L", "XL", "Free"];
 const cities = ["All", "Bengaluru", "Coimbatore"];
 const distances = [
@@ -31,18 +43,33 @@ export default function Browse() {
   );
 }
 
+function parseInitialCollection(rawParam: string | null): { collection: CollectionType; category: string } {
+  if (!rawParam) return { collection: "All", category: "All" };
+  const lower = rawParam.trim().toLowerCase();
+  if (lower === "men" || lower === "man" || lower === "male") return { collection: "Men", category: "All" };
+  if (lower === "women" || lower === "woman" || lower === "female") return { collection: "Women", category: "All" };
+  if (lower === "accessories" || lower === "accessory") return { collection: "Accessories", category: "All" };
+  
+  // Specific category provided (e.g. Lehenga, Sherwani)
+  const matched = allCategories.find((c) => c.toLowerCase() === lower);
+  if (matched) {
+    if (["lehenga", "saree", "anarkali", "gown"].includes(lower)) return { collection: "Women", category: matched };
+    if (["sherwani", "kurta", "suit", "blazer", "shirt", "pant", "tuxedo"].includes(lower)) return { collection: "Men", category: matched };
+    if (lower === "accessories") return { collection: "Accessories", category: "All" };
+    return { collection: "All", category: matched };
+  }
+  return { collection: "All", category: "All" };
+}
+
 function BrowseContent() {
   const searchParams = useSearchParams();
-  const initialCategory = searchParams.get("category");
+  const rawCategoryParam = searchParams.get("category") || searchParams.get("collection") || searchParams.get("gender");
+  const initialParsed = parseInitialCollection(rawCategoryParam);
   const initialPincode = searchParams.get("pincode") || "";
   const initialCity = searchParams.get("city") || "All";
-  const categoryFromQuery =
-    initialCategory === "men" ? "Sherwani" :
-    initialCategory === "women" ? "Lehenga" :
-    initialCategory === "accessories" ? "All" :
-    "All";
 
-  const [cat, setCat] = useState(categoryFromQuery);
+  const [collection, setCollection] = useState<CollectionType>(initialParsed.collection);
+  const [cat, setCat] = useState<string>(initialParsed.category);
   const [city, setCity] = useState(initialCity);
   const [occ, setOcc] = useState("All");
   const [size, setSize] = useState("All");
@@ -56,9 +83,17 @@ function BrowseContent() {
   const [apiListings, setApiListings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const railRef = useRef<HTMLDivElement>(null);
+
   const scrollRail = (direction: number) => {
     railRef.current?.scrollBy({ left: direction, behavior: "smooth" });
   };
+
+  // Sync state if URL query params change
+  useEffect(() => {
+    const parsed = parseInitialCollection(rawCategoryParam);
+    setCollection(parsed.collection);
+    setCat(parsed.category);
+  }, [rawCategoryParam]);
 
   useEffect(() => {
     fetch('/api/listings')
@@ -70,6 +105,13 @@ function BrowseContent() {
       .catch(() => setLoading(false));
   }, []);
 
+  const activeCategoryList = useMemo(() => {
+    if (collection === "Women") return womenCategories;
+    if (collection === "Men") return menCategories;
+    if (collection === "Accessories") return accessoriesCategories;
+    return allCategories;
+  }, [collection]);
+
   const filtered = useMemo(
     () =>
       apiListings.filter(
@@ -77,19 +119,71 @@ function BrowseContent() {
           const isVerified = l.ownerId?.isVerified || l.verified;
           const listingCat = l.category || 'All';
           const listingOcc = l.occasion || 'All';
+          const listingGender = (l.gender || 'Unisex').toLowerCase();
           const listingCity = l.city || l.area || "Bengaluru";
           const listingPincode = String(l.pincode || "");
           const distanceKm = l.distanceKm || 0;
-          const text = `${l.title || l.name || ""} ${l.description || ""} ${listingCat} ${listingOcc}`.toLowerCase();
-          return (cat === "All" || listingCat.toLowerCase() === cat.toLowerCase()) &&
-                 (city === "All" || listingCity.toLowerCase() === city.toLowerCase()) &&
-                 (occ === "All" || listingOcc.toLowerCase() === occ.toLowerCase()) &&
-                 (size === "All" || l.size === size) &&
-                 distanceKm <= maxKm &&
-                 (!trustedOnly || isVerified) &&
-                 (!pincode || listingPincode.includes(pincode.replace(/\D/g, ""))) &&
-                 (!searchTerm || text.includes(searchTerm.toLowerCase())) &&
-                 (!date || !isDateBlocked(l, date));
+          const catLower = listingCat.toLowerCase();
+          const text = `${l.title || l.name || ""} ${l.description || ""} ${listingCat} ${listingOcc} ${l.gender || ""}`.toLowerCase();
+
+          // 1. Collection/Gender Filter
+          let matchesCollection = true;
+          if (collection === "Women") {
+            matchesCollection =
+              listingGender === "women" ||
+              ["lehenga", "saree", "anarkali", "gown", "co-ord set"].includes(catLower);
+          } else if (collection === "Men") {
+            matchesCollection =
+              listingGender === "men" ||
+              ["sherwani", "kurta", "suit", "blazer", "shirt", "pant", "dhoti", "tuxedo"].includes(catLower);
+          } else if (collection === "Accessories") {
+            matchesCollection =
+              catLower === "accessories" ||
+              ["sneakers", "cap", "watch", "belt", "trolley", "bag"].some((k) => text.includes(k));
+          }
+
+          // 2. Specific Category Filter
+          let matchesCategory = true;
+          if (cat !== "All") {
+            matchesCategory = catLower.includes(cat.toLowerCase()) || text.includes(cat.toLowerCase());
+          }
+
+          // 3. City Filter
+          const matchesCity = city === "All" || listingCity.toLowerCase() === city.toLowerCase();
+
+          // 4. Occasion Filter
+          const matchesOcc = occ === "All" || listingOcc.toLowerCase() === occ.toLowerCase();
+
+          // 5. Size Filter
+          const matchesSize = size === "All" || l.size === size || l.size === "Free";
+
+          // 6. Distance Filter
+          const matchesDistance = distanceKm <= maxKm;
+
+          // 7. Trusted Filter
+          const matchesTrusted = !trustedOnly || isVerified;
+
+          // 8. Pincode Filter
+          const matchesPincode = !pincode || listingPincode.includes(pincode.replace(/\D/g, ""));
+
+          // 9. Search Term
+          const matchesSearch = !searchTerm || text.includes(searchTerm.toLowerCase());
+
+          // 10. Date Availability
+          const matchesDate = !date || !isDateBlocked(l, date);
+
+          return (
+            matchesCollection &&
+            matchesCategory &&
+            matchesCity &&
+            matchesOcc &&
+            matchesSize &&
+            matchesDistance &&
+            matchesTrusted &&
+            matchesPincode &&
+            matchesSearch &&
+            matchesDate
+          );
         }
       ).sort((a, b) => {
         const aPrice = a.rentalPricePerDay || a.pricePerDay || 0;
@@ -106,19 +200,20 @@ function BrowseContent() {
         if (sort === "Top rated") return bRating - aRating;
         return Number(bVerified) - Number(aVerified) || bRating - aRating;
       }),
-    [apiListings, cat, city, occ, size, maxKm, date, sort, trustedOnly, searchTerm, pincode],
+    [apiListings, collection, cat, city, occ, size, maxKm, date, sort, trustedOnly, searchTerm, pincode],
   );
 
   useEffect(() => {
     if (loading) return;
-    const filters = { cat, city, occ, size, maxKm, trustedOnly, date: date?.toISOString(), searchTerm, pincode };
+    const filters = { collection, cat, city, occ, size, maxKm, trustedOnly, date: date?.toISOString(), searchTerm, pincode };
     trackEvent("filter_changed", filters);
     if (apiListings.length > 0 && filtered.length === 0) {
       trackEvent("zero_results", filters);
     }
-  }, [cat, occ, size, maxKm, trustedOnly, date, searchTerm, filtered.length, apiListings.length, loading]);
+  }, [collection, cat, city, occ, size, maxKm, trustedOnly, date, searchTerm, filtered.length, apiListings.length, loading]);
 
   const activeCount = [
+    collection !== "All",
     searchTerm,
     cat !== "All",
     city !== "All",
@@ -131,7 +226,17 @@ function BrowseContent() {
   ].filter(Boolean).length;
 
   const clearAll = () => {
-    setSearchTerm(""); setPincode(""); setCat("All"); setCity("All"); setOcc("All"); setSize("All"); setMaxKm(999); setDate(undefined); setSort("Recommended"); setTrustedOnly(false);
+    setCollection("All");
+    setCat("All");
+    setSearchTerm("");
+    setPincode("");
+    setCity("All");
+    setOcc("All");
+    setSize("All");
+    setMaxKm(999);
+    setDate(undefined);
+    setSort("Recommended");
+    setTrustedOnly(false);
   };
 
   const startVoiceSearch = () => {
@@ -158,16 +263,46 @@ function BrowseContent() {
 
   return (
     <div className="bg-background">
-      <section className="container-edit pt-12 md:pt-16 pb-10 border-b border-border">
+      {/* Header Section with Collection Tabs */}
+      <section className="container-edit pt-12 md:pt-16 pb-8 border-b border-border">
         <p className="eyebrow flex items-center gap-2">
           <MapPin className="h-3 w-3" /> Bengaluru + Coimbatore / pincode search / 5 km radius
         </p>
-        <h1 className="font-display text-4xl md:text-6xl mt-4 text-ink leading-[1.05]">
-          {filtered.length} outfits<br />
-          <span className="italic text-primary">within walking distance.</span>
-        </h1>
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mt-4">
+          <div>
+            <h1 className="font-display text-4xl md:text-6xl text-ink leading-[1.05]">
+              {filtered.length} outfits<br />
+              <span className="italic text-primary">within walking distance.</span>
+            </h1>
+          </div>
+
+          {/* Primary Collection Tabs */}
+          <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-secondary p-1.5 border border-border">
+            {collections.map((item) => {
+              const isActive = collection === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setCollection(item.id);
+                    setCat("All");
+                  }}
+                  className={cn(
+                    "rounded-xl px-4 py-2 text-sm font-medium transition-all",
+                    isActive
+                      ? "bg-background text-ink shadow-sm ring-1 ring-border font-semibold"
+                      : "text-muted-foreground hover:text-ink"
+                  )}
+                >
+                  {item.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </section>
 
+      {/* Horizontal Filter Rail */}
       <section className="container-edit sticky top-16 z-30 border-b border-border bg-background/92 py-4 backdrop-blur md:top-20">
         <div className="flex items-stretch gap-2">
           <button
@@ -187,12 +322,14 @@ function BrowseContent() {
               <SlidersHorizontal className="h-3.5 w-3.5" />
               <span>Filters{activeCount > 0 && ` (${activeCount})`}</span>
             </div>
+
+            {/* Search Input */}
             <div className="shrink-0 flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5">
               <Search className="h-3.5 w-3.5 text-muted-foreground" />
               <input
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Search outfits"
+                placeholder="Search outfits or brands"
                 className="w-36 bg-transparent text-xs outline-none"
               />
               <button
@@ -204,18 +341,28 @@ function BrowseContent() {
                 <Mic className="h-3.5 w-3.5" />
               </button>
             </div>
+
+            {/* Category Filter */}
             <div className="shrink-0">
-              <FilterRow label="City" value={city} setValue={setCity} options={cities} />
+              <FilterRow label="Category" value={cat} setValue={setCat} options={activeCategoryList} />
             </div>
+
+            {/* Occasion Filter */}
             <div className="shrink-0">
               <FilterRow label="Occasion" value={occ} setValue={setOcc} options={occasions} />
             </div>
+
+            {/* City Filter */}
             <div className="shrink-0">
-              <FilterRow label="Category" value={cat} setValue={setCat} options={categories} />
+              <FilterRow label="City" value={city} setValue={setCity} options={cities} />
             </div>
+
+            {/* Size Filter */}
             <div className="shrink-0">
               <FilterRow label="Size" value={size} setValue={setSize} options={sizes} />
             </div>
+
+            {/* Distance Filter */}
             <div className="shrink-0">
               <FilterRow
                 label="Distance"
@@ -224,9 +371,13 @@ function BrowseContent() {
                 options={distances.map((d) => d.label)}
               />
             </div>
+
+            {/* Sort */}
             <div className="shrink-0">
               <FilterRow label="Sort" value={sort} setValue={setSort} options={["Recommended", "Nearest", "Price low", "Top rated"]} />
             </div>
+
+            {/* Trusted Only Toggle */}
             <button
               onClick={() => setTrustedOnly(!trustedOnly)}
               className={cn(
@@ -236,6 +387,8 @@ function BrowseContent() {
             >
               Trusted Only
             </button>
+
+            {/* Pincode Search */}
             <div className="shrink-0 flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5">
               <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
               <input
@@ -247,6 +400,8 @@ function BrowseContent() {
                 className="w-24 bg-transparent text-xs outline-none"
               />
             </div>
+
+            {/* Date Picker */}
             <Popover>
               <PopoverTrigger asChild>
                 <button
@@ -269,10 +424,12 @@ function BrowseContent() {
                 />
               </PopoverContent>
             </Popover>
+
+            {/* Clear All Button */}
             {activeCount > 0 && (
               <button
                 onClick={clearAll}
-                className="shrink-0 inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                className="shrink-0 inline-flex items-center gap-1 text-xs text-primary font-semibold hover:underline"
               >
                 <X className="h-3 w-3" /> Clear all
               </button>
@@ -290,15 +447,20 @@ function BrowseContent() {
         </div>
       </section>
 
+      {/* Grid of Listings */}
       <section className="container-edit py-14">
         {loading ? (
           <div className="text-center py-20 text-muted-foreground">Loading outfits...</div>
         ) : filtered.length === 0 ? (
-          <div className="text-center py-20">
-            <p className="font-display text-2xl text-muted-foreground">
-              No outfits match - try widening your filters.
+          <div className="text-center py-20 max-w-md mx-auto">
+            <Sparkles className="mx-auto h-8 w-8 text-primary mb-3" />
+            <p className="font-display text-2xl text-ink">No outfits match your filters</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Try switching sections or resetting your distance and occasion filters.
             </p>
-            <button onClick={clearAll} className="mt-4 text-sm text-primary underline">Reset filters</button>
+            <button onClick={clearAll} className="mt-5 btn-primary text-xs px-5 py-2.5">
+              Reset all filters
+            </button>
           </div>
         ) : (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-5 gap-y-12">

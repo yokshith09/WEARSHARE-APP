@@ -39,12 +39,12 @@ export default function RenterDashboard() {
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/bookings").then((res) => res.json()),
-      fetch("/api/wishlist").then((res) => (res.ok ? res.json() : { wishlist: [] })),
-      fetch("/api/profile").then((res) => (res.ok ? res.json() : null)),
+      fetch("/api/bookings").then((res) => (res.ok ? res.json() : { rentals: [] })).catch(() => ({ rentals: [] })),
+      fetch("/api/wishlist").then((res) => (res.ok ? res.json() : { wishlist: [] })).catch(() => ({ wishlist: [] })),
+      fetch("/api/profile").then((res) => (res.ok ? res.json() : null)).catch(() => null),
     ])
       .then(([bookingData, wishlistData, profileData]: [any, any, { measurements?: Record<string, string> } | null]) => {
-        setData(bookingData);
+        setData(bookingData?.rentals ? bookingData : { rentals: [] });
         setWishlist(Array.isArray(wishlistData?.wishlist) ? wishlistData.wishlist : []);
         setMeasurements(profileData?.measurements || {});
       })

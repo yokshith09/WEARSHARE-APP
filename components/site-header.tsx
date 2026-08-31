@@ -5,9 +5,9 @@ import { useSession } from "next-auth/react";
 import { Gem, Heart, LayoutDashboard, Menu, Search, ShoppingCart, User, X } from "lucide-react";
 
 const navLinks = [
-  { href: "/browse?category=men", label: "Men" },
-  { href: "/browse?category=women", label: "Women" },
-  { href: "/browse?category=accessories", label: "Accessories" },
+  { href: "/browse?collection=men", label: "Men" },
+  { href: "/browse?collection=women", label: "Women" },
+  { href: "/browse?collection=accessories", label: "Accessories" },
   { href: "/how-it-works", label: "How it works" },
 ];
 

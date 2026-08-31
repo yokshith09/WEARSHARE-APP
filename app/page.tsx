@@ -354,9 +354,9 @@ export default async function Index() {
           </div>
         </div>
         <div className="grid gap-8 md:grid-cols-3">
-          <CollectionCard href="/browse?category=men" src="/men_collection.png" title="MEN" />
-          <CollectionCard href="/browse?category=women" src="/women_collection.png" title="WOMEN" />
-          <CollectionCard href="/browse?category=accessories" src="/accessories_collection.png" title="ACCESSORIES" />
+          <CollectionCard href="/browse?collection=men" src="/men_collection.png" title="MEN" />
+          <CollectionCard href="/browse?collection=women" src="/women_collection.png" title="WOMEN" />
+          <CollectionCard href="/browse?collection=accessories" src="/accessories_collection.png" title="ACCESSORIES" />
         </div>
       </section>
 

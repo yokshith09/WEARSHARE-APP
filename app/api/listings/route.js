@@ -64,7 +64,7 @@ export async function GET(request) {
           description: l.description,
           category: l.category,
           occasion: l.occasion,
-          gender: l.gender,
+          gender: l.gender || 'Unisex',
           listingType: l.listing_type,
           size: l.size,
           condition: l.condition,
@@ -93,10 +93,45 @@ export async function GET(request) {
       console.warn('[Listings API] Supabase query warning:', dbErr.message);
     }
 
+    // If user's own items were requested, return what we found in DB
+    if (userOnly) {
+      return NextResponse.json(mappedListings);
+    }
+
     // Fallback to catalogue listings if database has 0 matching items
     if (mappedListings.length === 0) {
       const { listings: catalogListings } = await import('@/lib/listings');
-      mappedListings = catalogListings.map(l => ({
+      let filteredCatalog = catalogListings;
+
+      if (category && category.toLowerCase() !== 'all') {
+        filteredCatalog = filteredCatalog.filter(l => l.category.toLowerCase().includes(category.toLowerCase()));
+      }
+      if (gender && gender.toLowerCase() !== 'all') {
+        filteredCatalog = filteredCatalog.filter(l => (l.gender || 'Unisex').toLowerCase() === gender.toLowerCase() || l.gender === 'Unisex');
+      }
+      if (occasion && occasion.toLowerCase() !== 'all') {
+        filteredCatalog = filteredCatalog.filter(l => l.occasion.toLowerCase().includes(occasion.toLowerCase()));
+      }
+      if (size && size.toLowerCase() !== 'all') {
+        filteredCatalog = filteredCatalog.filter(l => l.size === size);
+      }
+      if (city && city.toLowerCase() !== 'all') {
+        filteredCatalog = filteredCatalog.filter(l => l.city.toLowerCase().includes(city.toLowerCase()));
+      }
+      if (pincode) {
+        filteredCatalog = filteredCatalog.filter(l => String(l.pincode || '').includes(pincode));
+      }
+      if (search) {
+        const s = search.toLowerCase();
+        filteredCatalog = filteredCatalog.filter(l =>
+          l.title.toLowerCase().includes(s) ||
+          l.category.toLowerCase().includes(s) ||
+          l.occasion.toLowerCase().includes(s) ||
+          (l.area && l.area.toLowerCase().includes(s))
+        );
+      }
+
+      mappedListings = filteredCatalog.map(l => ({
         _id: l.id,
         id: l.id,
         name: l.title,
@@ -104,6 +139,7 @@ export async function GET(request) {
         description: `${l.occasion} wear available for rent in ${l.area}, ${l.city}`,
         category: l.category,
         occasion: l.occasion,
+        gender: l.gender || 'Unisex',
         size: l.size,
         condition: 'Like New',
         rentalPricePerDay: l.pricePerDay,
