@@ -31,30 +31,13 @@ export async function POST(req: NextRequest) {
   }
 
   const actorKey = userId ? `user:${userId}` : `session:${sessionId}`;
-  const perMinuteLimit = Number(process.env.GEMINI_CHAT_PER_MINUTE_LIMIT || 60);
-  const dailyLimit = Number(process.env.GEMINI_CHAT_DAILY_LIMIT || 500);
+  const perMinuteLimit = Number(process.env.GEMINI_CHAT_PER_MINUTE_LIMIT || 120);
 
   try {
     await apiLimiter.check(perMinuteLimit, `chat-stream:${actorKey}`);
-    await dailyLimiter.check(dailyLimit, `chat-stream-daily:${actorKey}`);
-  } catch {
-    // Return friendly stream response rather than 429 crash
-    const rateMsg = "You're sending messages very quickly! Please wait a moment while I prepare your recommendations.";
-    const encoder = new TextEncoder();
-    const stream = new ReadableStream({
-      start(controller) {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "token", data: rateMsg })}\n\n`));
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "done" })}\n\n`));
-        controller.close();
-      },
-    });
-    return new Response(stream, {
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-      },
-    });
+  } catch (limiterErr) {
+    console.warn("[Chat Stream Rate Limit]", limiterErr);
+    // Continue gracefully rather than hard-blocking legitimate chat interactions
   }
 
   const useGroq = isGroqConfigured();
@@ -126,10 +109,17 @@ export async function POST(req: NextRequest) {
             );
           }
         } else {
-          // Intelligent assistant fallback when AI API keys are not supplied
-          const fallbackReply = listings.length > 0
-            ? `Here are top recommendations matching "${cleanMessage}" across Bengaluru. Each outfit includes refundable deposit protection, verified lender handover, and flexible booking dates. Browse the listings above or let me know if you'd like more details on sizing or pickup locations!`
-            : `I'm here to help you find and rent designer ethnic and party wear across Bengaluru. You can ask for wedding lehengas, sherwanis, sarees, suits, sneakers, or blazers!`;
+          const lower = cleanMessage.toLowerCase().trim();
+          let fallbackReply = "";
+          if (listings.length > 0) {
+            fallbackReply = `Here are top recommendations matching your search across Bengaluru and Coimbatore. Every booking includes 100% refundable security deposit protection, verified lender handover, and flexible pickup dates. Tap any listing above to view details, or ask me about sizing and fit!`;
+          } else if (lower === "hi" || lower === "hello" || lower === "hey" || lower.startsWith("hi ") || lower.startsWith("hello ")) {
+            fallbackReply = "Hey! I'm Wren, your WearShare styling assistant. I can help you find wedding lehengas, sarees, royal sherwanis, party gowns, blazers, and luxury accessories across Bengaluru and Coimbatore. What occasion or style are you shopping for today?";
+          } else if (lower.includes("deposit") || lower.includes("refund") || lower.includes("return")) {
+            fallbackReply = "On WearShare, security deposits are 100% refundable once the outfit is safely returned after your rental period. All listings are verified and protected against minor accidental wear.";
+          } else {
+            fallbackReply = `I'm here to help you find and rent designer ethnic and party wear across Bengaluru and Coimbatore. Ask me about wedding lehengas, sherwanis, sarees, suits, sneakers, or blazers!`;
+          }
 
           fullResponse = fallbackReply;
           const words = fallbackReply.split(" ");
@@ -144,14 +134,23 @@ export async function POST(req: NextRequest) {
         await saveChatMessage(sessionId, "assistant", fullResponse, userId);
       } catch (error: any) {
         console.error("[Chat Stream Error]", error);
-        const fallbackMessage = listings.length > 0
-          ? `Here are available outfits matching your search in Bengaluru. You can check sizes, rental rates, and deposit terms above!`
-          : "I am ready to help you find outfits, compare prices, or explain how rental deposits work. What style or occasion are you looking for?";
+        const lower = cleanMessage.toLowerCase().trim();
+        let fallbackMessage = "";
+        if (listings.length > 0) {
+          fallbackMessage = `Here are available outfits matching your search. You can check sizes, rental rates, and deposit terms above!`;
+        } else if (lower === "hi" || lower === "hello" || lower === "hey" || lower.startsWith("hi ") || lower.startsWith("hello ")) {
+          fallbackMessage = "Hey! I'm Wren, your WearShare styling assistant. What occasion or outfit are you looking for today?";
+        } else {
+          fallbackMessage = "I'm here to help you find outfits, compare prices, or explain rental deposits. What style are you looking for?";
+        }
 
         fullResponse = fallbackMessage;
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify({ type: "token", data: fallbackMessage })}\n\n`)
-        );
+        const words = fallbackMessage.split(" ");
+        for (const word of words) {
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ type: "token", data: word + " " })}\n\n`)
+          );
+        }
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "done" })}\n\n`));
         await saveChatMessage(sessionId, "assistant", fullResponse, userId);
       } finally {

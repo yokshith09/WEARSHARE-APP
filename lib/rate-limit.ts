@@ -4,49 +4,58 @@ export const rateLimit = (options?: {
   interval?: number;
   uniqueTokenPerInterval?: number;
 }) => {
-  const tokenCache = new Map();
+  const tokenCache = new Map<string, number[]>();
   const interval = options?.interval || 60000; // 1 minute
-  const limit = options?.uniqueTokenPerInterval || 10;
 
   return {
     check: async (limit: number, token: string) => {
       if (redis) {
-        const key = `rate:${token}`;
-        const count = await redis.incr(key);
-        if (count === 1) {
-          await redis.expire(key, Math.ceil(interval / 1000));
+        try {
+          const key = `rate:${token}`;
+          const count = await redis.incr(key);
+          if (count === 1) {
+            await redis.expire(key, Math.ceil(interval / 1000));
+          }
+          if (count > limit) {
+            throw new Error("Rate limit exceeded");
+          }
+          return;
+        } catch (redisErr: any) {
+          if (redisErr?.message === "Rate limit exceeded") throw redisErr;
+          // Fall through to in-memory on Redis connection issues
         }
-        if (count > limit) {
-          throw new Error("Rate limit exceeded");
-        }
-        return;
       }
 
-      return new Promise<void>((resolve, reject) => {
-        const tokenCount = tokenCache.get(token) || [0];
-        if (tokenCount[0] === 0) {
-          tokenCache.set(token, [1]);
-          setTimeout(() => {
-            tokenCache.delete(token);
-          }, interval);
-          resolve();
-        } else {
-          tokenCount[0] += 1;
-          tokenCache.set(token, tokenCount);
-          if (tokenCount[0] > limit) {
-            reject(new Error("Rate limit exceeded"));
-          } else {
-            resolve();
+      const now = Date.now();
+      const timestamps = tokenCache.get(token) || [];
+      const windowStart = now - interval;
+      const recentTimestamps = timestamps.filter((t) => t > windowStart);
+
+      if (recentTimestamps.length >= limit) {
+        throw new Error("Rate limit exceeded");
+      }
+
+      recentTimestamps.push(now);
+      tokenCache.set(token, recentTimestamps);
+
+      // Clean up old entries periodically
+      if (tokenCache.size > 1000) {
+        tokenCache.forEach((v, k) => {
+          if (v.every((t) => t <= windowStart)) {
+            tokenCache.delete(k);
           }
-        }
-      });
+        });
+      }
     },
     reset: async (token: string) => {
       if (redis) {
-        await redis.del(`rate:${token}`);
-        return;
+        try {
+          await redis.del(`rate:${token}`);
+          return;
+        } catch {
+          // ignore
+        }
       }
-
       tokenCache.delete(token);
     },
   };

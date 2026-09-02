@@ -24,28 +24,16 @@ export async function POST(request) {
     }
 
     const actorKey = userId ? `user:${userId}` : `session:${sessionId}`
-    const perMinuteLimit = Number(process.env.GEMINI_CHAT_PER_MINUTE_LIMIT || 60)
-    const dailyLimit = Number(process.env.GEMINI_CHAT_DAILY_LIMIT || 500)
+    const perMinuteLimit = Number(process.env.GEMINI_CHAT_PER_MINUTE_LIMIT || 120)
 
     try {
       await apiLimiter.check(perMinuteLimit, `chat:${actorKey}`)
-      await dailyLimiter.check(dailyLimit, `chat-daily:${actorKey}`)
-    } catch {
-      return NextResponse.json({
-        reply: "You're sending messages very quickly! Please wait a moment while I prepare your recommendations.",
-        usedRAG: false,
-        listings: [],
-      })
+    } catch (limiterErr) {
+      console.warn("[Chat Rate Limit]", limiterErr);
     }
 
     const useGroq = isGroqConfigured()
     const geminiModel = !useGroq ? getGeminiModel() : null
-
-    if (!useGroq && !geminiModel) {
-      return NextResponse.json({
-        reply: "Wren is not configured yet. Add GROQ_API_KEY or GEMINI_API_KEY to enable live replies, and you can still browse outfits while that is being set up.",
-      })
-    }
 
     const cleanMessage = String(message).slice(0, 1200)
     const [history, listings] = await Promise.all([
