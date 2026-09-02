@@ -38,13 +38,13 @@ export async function GET(request) {
     if (userOnly && session?.user?.id) {
       query = query.eq('owner_id', session.user.id)
     }
-    if (category) query = query.ilike('category', `%${category}%`)
-    if (size) query = query.eq('size', size)
-    if (listingType) query = query.eq('listing_type', listingType) // Need to ensure schema has this if used
-    if (gender) query = query.eq('gender', gender) // Need to ensure schema has this if used
-    if (occasion) query = query.ilike('occasion', `%${occasion}%`)
-    if (city) query = query.ilike('city', `%${city}%`)
-    if (pincode) query = query.ilike('pincode', `%${pincode}%`)
+    if (category && category.toLowerCase() !== 'all') query = query.ilike('category', `%${category}%`)
+    if (size && size.toLowerCase() !== 'all') query = query.eq('size', size)
+    if (listingType && listingType.toLowerCase() !== 'all') query = query.eq('listing_type', listingType)
+    if (gender && gender.toLowerCase() !== 'all') query = query.ilike('gender', `%${gender}%`)
+    if (occasion && occasion.toLowerCase() !== 'all') query = query.ilike('occasion', `%${occasion}%`)
+    if (city && city.toLowerCase() !== 'all') query = query.ilike('city', `%${city}%`)
+    if (pincode && pincode.trim()) query = query.ilike('pincode', `%${pincode.trim()}%`)
     if (minPrice) query = query.gte('rental_price_per_day', Number(minPrice))
     if (maxPrice) query = query.lte('rental_price_per_day', Number(maxPrice))
     if (search) {
