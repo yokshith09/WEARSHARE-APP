@@ -134,3 +134,4 @@ Use these bullet points on your resume, LinkedIn, or personal portfolio:
   Dual-layer protection: Upstash Redis provides distributed availability locks during checkout initiation, reinforced by PostgreSQL unique constraints on booking ranges and calendar dates.
 * **How are connection limits handled in serverless?**  
   Service role queries utilize an 8-second timeout wrapper with aborted signals to prevent socket pooling exhaustion during edge spikes.
+

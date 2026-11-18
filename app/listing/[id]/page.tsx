@@ -93,6 +93,8 @@ export default function ListingDetail() {
   ].filter(Boolean)));
   const activeImage = selectedImage && galleryImages.includes(selectedImage) ? selectedImage : galleryImages[0] || image;
   
+  const isMediaVideo = (url?: string) => Boolean(url && /\.(mp4|webm|ogg)($|\?)/i.test(url));
+
   const subtotal = days * price;
   const protectionFee = Math.round(subtotal * 0.05);
   const total = subtotal + protectionFee + deposit;
@@ -141,22 +143,54 @@ export default function ListingDetail() {
         {/* Gallery */}
         <div className="min-w-0">
           <Card3D className="shadow-2xl">
-            <div className="aspect-[4/5] lg:aspect-[5/6] max-h-[720px] overflow-hidden bg-muted rounded-xl shadow-xl border border-border">
-              <img src={activeImage} alt={title} className="h-full w-full object-cover object-top" />
+            <div className="relative aspect-[4/5] lg:aspect-[5/6] max-h-[720px] overflow-hidden bg-muted rounded-xl shadow-xl border border-border group">
+              {isMediaVideo(activeImage) ? (
+                <video
+                  src={activeImage}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  controls
+                  className="h-full w-full object-cover object-top"
+                />
+              ) : (
+                <img src={activeImage} alt={title} className="h-full w-full object-cover object-top" />
+              )}
+              {isMediaVideo(activeImage) && (
+                <div className="absolute top-3 left-3 bg-black/75 backdrop-blur-md border border-white/20 text-white text-[11px] font-semibold px-3 py-1 rounded-full flex items-center gap-1.5 pointer-events-none shadow-lg">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                  Runway Drape Video (HD)
+                </div>
+              )}
             </div>
           </Card3D>
           {galleryImages.length > 1 && (
             <div className="grid grid-cols-4 gap-3 mt-4">
-              {galleryImages.slice(0, 4).map((src, i) => (
-                <button
-                  key={src}
-                  onClick={() => setSelectedImage(src)}
-                  className={`aspect-square overflow-hidden rounded-xl shadow-sm transition ${activeImage === src ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : "opacity-70 hover:opacity-100"}`}
-                  aria-label={`View photo ${i + 1}`}
-                >
-                  <img src={src} alt="" className="h-full w-full object-cover object-top" />
-                </button>
-              ))}
+              {galleryImages.slice(0, 4).map((src, i) => {
+                const isVid = isMediaVideo(src);
+                return (
+                  <button
+                    key={src}
+                    onClick={() => setSelectedImage(src)}
+                    className={`aspect-square overflow-hidden rounded-xl shadow-sm transition relative group ${activeImage === src ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : "opacity-70 hover:opacity-100"}`}
+                    aria-label={isVid ? `View runway video ${i + 1}` : `View photo ${i + 1}`}
+                  >
+                    {isVid ? (
+                      <div className="h-full w-full bg-slate-900 flex flex-col items-center justify-center text-white relative">
+                        <video src={src} muted className="h-full w-full object-cover opacity-60" />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                          <span className="bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shadow">
+                            ▶ Video
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <img src={src} alt="" className="h-full w-full object-cover object-top" />
+                    )}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>

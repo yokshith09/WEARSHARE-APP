@@ -18,6 +18,7 @@ export function ListingCard({ listing, priority = false }: { listing: any; prior
   const location = city && city !== area ? `${area}, ${city}` : area;
   const size = listing.size;
   const category = listing.category;
+  const hasVideo = Array.isArray(listing.photoUrls) && listing.photoUrls.some(u => Boolean(u && /\.(mp4|webm|ogg)($|\?)/i.test(u)));
 
   return (
     <Link href={`/listing/${listing._id || listing.id}`} className="group block">
@@ -43,6 +44,11 @@ export function ListingCard({ listing, priority = false }: { listing: any; prior
             {isVerified && (
               <span className="inline-flex items-center gap-1 rounded-full bg-primary/90 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white shadow-md backdrop-blur-md">
                 <BadgeCheck className="h-3 w-3" /> Trusted Lender
+              </span>
+            )}
+            {hasVideo && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-black/70 border border-white/20 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-sm backdrop-blur-md">
+                🎥 Video Drape
               </span>
             )}
           </div>
