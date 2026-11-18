@@ -57,7 +57,7 @@ export async function POST(request) {
         .from('carts')
         .select('id')
         .eq('user_id', session.user.id)
-        .single()
+        .maybeSingle()
 
       if (!cart) return NextResponse.json({ error: 'Cart is empty' }, { status: 400 })
 
@@ -175,7 +175,7 @@ export async function POST(request) {
         .from('carts')
         .select('id')
         .eq('user_id', session.user.id)
-        .single()
+        .maybeSingle()
 
       if (cart) {
         await supabaseAdmin

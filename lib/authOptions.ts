@@ -1,5 +1,6 @@
 import { NextAuthOptions } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
+import GoogleProvider from "next-auth/providers/google"
 import { supabaseAdmin } from "@/lib/supabase"
 import { otpVerificationLimiter } from "@/lib/rate-limit"
 import { randomUUID } from "crypto"
@@ -12,10 +13,21 @@ const SESSION_MAX_AGE_SECONDS = 30 * 24 * 60 * 60
 const SESSION_ABSOLUTE_MAX_AGE_SECONDS = 30 * 24 * 60 * 60
 const SESSION_ROTATION_SECONDS = 15 * 60
 
+const isLocalIp = (ip: string) => !ip || ip === "unknown" || ip === "127.0.0.1" || ip === "::1" || ip === "localhost"
+
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
   useSecureCookies: process.env.NODE_ENV === "production",
   providers: [
+    ...(process.env.GOOGLE_ID && process.env.GOOGLE_SECRET
+      ? [
+          GoogleProvider({
+            clientId: process.env.GOOGLE_ID,
+            clientSecret: process.env.GOOGLE_SECRET,
+            allowDangerousEmailAccountLinking: true,
+          }),
+        ]
+      : []),
     CredentialsProvider({
       id: "email-password",
       name: "Email and password",
@@ -43,12 +55,14 @@ export const authOptions: NextAuthOptions = {
             ip,
             userAgent,
           })
-          return null
+          throw new Error("Please enter a valid email address and a password of at least 8 characters.")
         }
 
         try {
           await otpVerificationLimiter.check(15, `password-auth:${email}`)
-          await otpVerificationLimiter.check(45, `password-auth:ip:${ip}`)
+          if (!isLocalIp(ip)) {
+            await otpVerificationLimiter.check(45, `password-auth:ip:${ip}`)
+          }
         } catch {
           await recordSecurityEvent({
             eventType: "auth.password.locked",
@@ -56,7 +70,7 @@ export const authOptions: NextAuthOptions = {
             ip,
             userAgent,
           })
-          return null
+          throw new Error("Too many sign-in attempts. Please wait a few minutes before trying again.")
         }
 
         const { data: existingUser, error: lookupError } = await supabaseAdmin
@@ -67,18 +81,18 @@ export const authOptions: NextAuthOptions = {
 
         if (lookupError) {
           console.error("[auth] supabase user lookup error:", lookupError)
-          return null
+          throw new Error("Database temporarily busy. Please retry in a moment.")
         }
 
         if (mode === "register") {
           if (existingUser?.password_hash) {
             console.warn("[auth] user already exists with password_hash for:", email)
-            return null
+            throw new Error("An account with this email already exists. Please sign in instead.")
           }
 
           const userId = existingUser?.id || randomUUID()
           const userName = rawName || existingUser?.name || email.split("@")[0]
-          const passwordHash = await bcrypt.hash(password, 12)
+          const passwordHash = await bcrypt.hash(password, 10)
 
           if (existingUser) {
             const { error: updateError } = await supabaseAdmin
@@ -94,7 +108,7 @@ export const authOptions: NextAuthOptions = {
 
             if (updateError) {
               console.error("[auth] user update error:", updateError)
-              return null
+              throw new Error("Could not update credentials. Please try again.")
             }
           } else {
             const { error: insertError } = await supabaseAdmin
@@ -110,7 +124,7 @@ export const authOptions: NextAuthOptions = {
 
             if (insertError) {
               console.error("[auth] user insert error:", insertError)
-              return null
+              throw new Error("Failed to create account. Please try again.")
             }
           }
 
@@ -122,14 +136,18 @@ export const authOptions: NextAuthOptions = {
           return { id: userId, name: userName, email }
         }
 
-        if (!existingUser?.password_hash) {
+        if (!existingUser) {
+          throw new Error("No account found with this email. Click 'Create account' to sign up.")
+        }
+
+        if (!existingUser.password_hash) {
           await recordSecurityEvent({
             eventType: "auth.password.missing_hash",
             severity: "info",
             ip,
             userAgent,
           })
-          return null
+          throw new Error("No password set for this account. Please use 'Create account' to set a password or use Google sign-in.")
         }
 
         const matches = await bcrypt.compare(password, existingUser.password_hash)
@@ -140,7 +158,7 @@ export const authOptions: NextAuthOptions = {
             ip,
             userAgent,
           })
-          return null
+          throw new Error("Incorrect password. Please verify your password or use 'Forgot password?'.")
         }
 
         await Promise.all([
@@ -276,10 +294,21 @@ export const authOptions: NextAuthOptions = {
     maxAge: SESSION_MAX_AGE_SECONDS,
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, account }) {
       if (user) {
-        token.id = user.id
+        if (account?.provider === "google" && user.email) {
+          const { data: dbUser } = await supabaseAdmin
+            .from("users")
+            .select("id")
+            .eq("email", user.email.toLowerCase().trim())
+            .maybeSingle()
+          token.id = dbUser?.id || user.id
+        } else {
+          token.id = user.id
+        }
         token.email = (user as any).email
+        token.name = user.name
+        token.picture = user.image
         token.sessionId = randomUUID()
         token.rotationId = randomUUID()
         token.authenticatedAt = Math.floor(Date.now() / 1000)
@@ -287,30 +316,32 @@ export const authOptions: NextAuthOptions = {
         token.sessionRevoked = false
 
         await setActiveSession(
-          String(user.id),
+          String(token.id),
           String(token.sessionId),
           SESSION_ABSOLUTE_MAX_AGE_SECONDS
         )
         return token
       }
 
-      if (!token.id || !token.sessionId || !token.authenticatedAt) {
+      if (!token.id) {
         token.sessionRevoked = true
         return token
       }
 
       const now = Math.floor(Date.now() / 1000)
-      const absoluteExpiry = Number(token.authenticatedAt) + SESSION_ABSOLUTE_MAX_AGE_SECONDS
-      const active = now < absoluteExpiry &&
-        await isActiveSession(String(token.id), String(token.sessionId))
+      if (token.authenticatedAt && token.sessionId) {
+        const absoluteExpiry = Number(token.authenticatedAt) + SESSION_ABSOLUTE_MAX_AGE_SECONDS
+        const active = now < absoluteExpiry &&
+          await isActiveSession(String(token.id), String(token.sessionId))
 
-      if (!active) {
-        token.sessionRevoked = true
-        token.id = undefined
-        return token
+        if (!active) {
+          token.sessionRevoked = true
+          token.id = undefined
+          return token
+        }
       }
 
-      if (now - Number(token.rotatedAt || 0) >= SESSION_ROTATION_SECONDS) {
+      if (token.rotatedAt && now - Number(token.rotatedAt || 0) >= SESSION_ROTATION_SECONDS) {
         token.rotationId = randomUUID()
         token.rotatedAt = now
       }
@@ -336,22 +367,34 @@ export const authOptions: NextAuthOptions = {
   },
   events: {
     async signIn({ user, account }) {
-      if (account?.provider === "google" && user?.id) {
+      if (account?.provider === "google" && user?.email) {
+        const email = user.email.toLowerCase().trim()
+        const { data: existingUser } = await supabaseAdmin
+          .from("users")
+          .select("id")
+          .eq("email", email)
+          .maybeSingle()
+
+        const userId = existingUser?.id || randomUUID()
+
         await supabaseAdmin
           .from("users")
           .upsert({
-            id: user.id,
-            name: user.name,
-            email: user.email,
-            image: user.image,
+            id: userId,
+            name: user.name || email.split("@")[0],
+            email,
+            image: user.image || null,
             email_verified: new Date().toISOString(),
             is_verified: true,
           }, { onConflict: "id" })
       }
 
+      const isUUID = (val: any) => typeof val === "string" && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(val)
+      const actorId = isUUID(user?.id) ? user.id : null
+
       await recordSecurityEvent({
         eventType: "auth.sign_in.succeeded",
-        actorId: user.id,
+        actorId,
         metadata: { provider: account?.provider || "unknown" },
       })
     },

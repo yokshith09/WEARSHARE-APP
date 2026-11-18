@@ -43,7 +43,7 @@ export async function POST(request) {
         .from('carts')
         .select('id')
         .eq('user_id', session.user.id)
-        .single()
+        .maybeSingle()
 
       if (!cart) return NextResponse.json({ error: 'Cart is empty' }, { status: 400 })
 
@@ -95,7 +95,7 @@ export async function POST(request) {
         .from('carts')
         .select('id')
         .eq('user_id', session.user.id)
-        .single()
+        .maybeSingle()
       const { data: cartItemsForLocks } = cart ? await supabaseAdmin
         .from('cart_items')
         .select('listing_id, rental_start, rental_end')

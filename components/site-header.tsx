@@ -18,6 +18,10 @@ export function SiteHeader() {
   const accountHref = status === "authenticated" ? "/profile" : "/login?callbackUrl=/profile";
 
   useEffect(() => {
+    if (status !== "authenticated") {
+      setCartCount(0);
+      return;
+    }
     fetch('/api/cart')
       .then(res => res.json())
       .then(data => {
@@ -26,7 +30,7 @@ export function SiteHeader() {
         }
       })
       .catch(() => {});
-  }, []);
+  }, [status]);
 
   return (
     <header className="sticky top-0 z-40 glass shadow-sm transition-all duration-300">

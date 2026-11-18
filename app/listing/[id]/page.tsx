@@ -12,6 +12,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useParams, useRouter } from "next/navigation";
 import { trackEvent } from "@/lib/analytics";
+import { Card3D } from "@/components/ui/card-3d";
 
 export default function ListingDetail() {
   const params = useParams();
@@ -46,11 +47,11 @@ export default function ListingDetail() {
       })
       .catch(() => setLoading(false));
 
-    fetch('/api/listings')
+    fetch('/api/listings?limit=4')
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
-           setOthers(data.filter(l => l._id !== id).slice(0, 3));
+           setOthers(data.filter(l => (l._id || l.id) !== id).slice(0, 3));
         }
       });
   }, [id]);
@@ -139,9 +140,11 @@ export default function ListingDetail() {
       <section className="container-edit pt-6 pb-16 grid lg:grid-cols-[minmax(0,0.95fr)_minmax(360px,0.65fr)] gap-8 lg:gap-14">
         {/* Gallery */}
         <div className="min-w-0">
-          <div className="aspect-[4/5] lg:aspect-[5/6] max-h-[720px] overflow-hidden bg-muted rounded-xl shadow-xl border border-border">
-            <img src={activeImage} alt={title} className="h-full w-full object-cover object-top" />
-          </div>
+          <Card3D className="shadow-2xl">
+            <div className="aspect-[4/5] lg:aspect-[5/6] max-h-[720px] overflow-hidden bg-muted rounded-xl shadow-xl border border-border">
+              <img src={activeImage} alt={title} className="h-full w-full object-cover object-top" />
+            </div>
+          </Card3D>
           {galleryImages.length > 1 && (
             <div className="grid grid-cols-4 gap-3 mt-4">
               {galleryImages.slice(0, 4).map((src, i) => (

@@ -209,3 +209,30 @@ BEGIN
   LIMIT match_count;
 END;
 $$;
+
+-- 15. Security Events Table
+CREATE TABLE IF NOT EXISTS public.security_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_type TEXT NOT NULL,
+  severity TEXT DEFAULT 'info',
+  actor_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+  ip_hash TEXT,
+  user_agent_hash TEXT,
+  metadata JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS security_events_event_type_idx ON public.security_events(event_type);
+CREATE INDEX IF NOT EXISTS security_events_created_at_idx ON public.security_events(created_at);
+
+-- 16. Performance Indexes
+CREATE INDEX IF NOT EXISTS listings_available_created_idx ON public.listings(available, created_at DESC);
+CREATE INDEX IF NOT EXISTS listings_owner_id_idx ON public.listings(owner_id);
+CREATE INDEX IF NOT EXISTS listings_category_idx ON public.listings(category);
+CREATE INDEX IF NOT EXISTS listings_city_idx ON public.listings(city);
+CREATE INDEX IF NOT EXISTS bookings_renter_id_idx ON public.bookings(renter_id);
+CREATE INDEX IF NOT EXISTS bookings_lender_id_idx ON public.bookings(lender_id);
+CREATE INDEX IF NOT EXISTS bookings_listing_id_idx ON public.bookings(listing_id);
+CREATE INDEX IF NOT EXISTS cart_items_cart_id_idx ON public.cart_items(cart_id);
+CREATE INDEX IF NOT EXISTS cart_items_listing_id_idx ON public.cart_items(listing_id);
+CREATE INDEX IF NOT EXISTS wishlists_user_id_idx ON public.wishlists(user_id);

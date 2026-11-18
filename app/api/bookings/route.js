@@ -8,20 +8,23 @@ export async function GET(request) {
   if (!session || !session.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
-    const { data: rentals, error: rentalsError } = await supabaseAdmin
-      .from('bookings')
-      .select('*, listings(*)')
-      .eq('renter_id', session.user.id)
-      .order('created_at', { ascending: false })
+    const [
+      { data: rentals, error: rentalsError },
+      { data: lending, error: lendingError },
+    ] = await Promise.all([
+      supabaseAdmin
+        .from('bookings')
+        .select('*, listings(*)')
+        .eq('renter_id', session.user.id)
+        .order('created_at', { ascending: false }),
+      supabaseAdmin
+        .from('bookings')
+        .select('*, listings(*)')
+        .eq('lender_id', session.user.id)
+        .order('created_at', { ascending: false }),
+    ])
 
     if (rentalsError) throw rentalsError
-
-    const { data: lending, error: lendingError } = await supabaseAdmin
-      .from('bookings')
-      .select('*, listings(*)')
-      .eq('lender_id', session.user.id)
-      .order('created_at', { ascending: false })
-
     if (lendingError) throw lendingError
 
     const normalizeStatus = (status) => {

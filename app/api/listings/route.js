@@ -18,12 +18,36 @@ export async function GET(request) {
     const pincode = searchParams.get('pincode')
     const userOnly = searchParams.get('user') || searchParams.get('mine')
 
-    const session = await getServerSession(authOptions)
+    const limitParam = parseInt(searchParams.get('limit') || '50', 10)
+    const limit = Math.min(Math.max(isNaN(limitParam) ? 50 : limitParam, 1), 50)
+
+    let session = null
+    if (userOnly) {
+      session = await getServerSession(authOptions)
+    }
 
     let query = supabaseAdmin
       .from('listings')
       .select(`
-        *,
+        id,
+        title,
+        description,
+        category,
+        occasion,
+        gender,
+        listing_type,
+        size,
+        condition,
+        rental_price_per_day,
+        security_deposit,
+        retail_price,
+        image_url,
+        photo_urls,
+        city,
+        area,
+        pincode,
+        available,
+        created_at,
         owner:users!owner_id (
           id,
           name,
@@ -33,7 +57,7 @@ export async function GET(request) {
       `)
       .eq('available', true)
       .order('created_at', { ascending: false })
-      .limit(50)
+      .limit(limit)
 
     if (userOnly && session?.user?.id) {
       query = query.eq('owner_id', session.user.id)

@@ -5,6 +5,7 @@ import { listings as dummyListings, inr } from "@/lib/listings";
 import { ListingCard } from "@/components/listing-card";
 import { supabaseAdmin } from "@/lib/supabase";
 import { WaitlistForm } from "@/components/waitlist-form";
+import { Card3D } from "@/components/ui/card-3d";
 
 export const revalidate = 60;
 
@@ -46,7 +47,19 @@ export default async function Index() {
     const { data: listings, error } = await supabaseAdmin
       .from("listings")
       .select(`
-        *,
+        id,
+        title,
+        description,
+        category,
+        city,
+        pincode,
+        area,
+        size,
+        condition,
+        rental_price_per_day,
+        security_deposit,
+        image_url,
+        available,
         owner:users!owner_id (
           id,
           name,
@@ -60,35 +73,38 @@ export default async function Index() {
 
     if (error) throw error;
 
-    const plainData: HomeListing[] = (listings || []).map((listing) => ({
-      _id: listing.id,
-      id: listing.id,
-      name: listing.title,
-      title: listing.title,
-      description: listing.description,
-      category: listing.category,
-      city: listing.city,
-      pincode: listing.pincode,
-      area: listing.area,
-      size: listing.size,
-      condition: listing.condition,
-      rentalPricePerDay: listing.rental_price_per_day,
-      pricePerDay: listing.rental_price_per_day,
-      securityDeposit: listing.security_deposit,
-      deposit: listing.security_deposit,
-      imageUrl: listing.image_url,
-      image: listing.image_url,
-      available: listing.available,
-      ownerId: listing.owner
-        ? {
-            _id: listing.owner.id,
-            name: listing.owner.name,
-            isVerified: listing.owner.is_verified,
-            rating: listing.owner.rating,
-          }
-        : null,
-      lister: listing.owner?.name,
-    }));
+    const plainData: HomeListing[] = (listings || []).map((listing: any) => {
+      const owner = Array.isArray(listing.owner) ? listing.owner[0] : listing.owner;
+      return {
+        _id: listing.id,
+        id: listing.id,
+        name: listing.title,
+        title: listing.title,
+        description: listing.description,
+        category: listing.category,
+        city: listing.city,
+        pincode: listing.pincode,
+        area: listing.area,
+        size: listing.size,
+        condition: listing.condition,
+        rentalPricePerDay: listing.rental_price_per_day,
+        pricePerDay: listing.rental_price_per_day,
+        securityDeposit: listing.security_deposit,
+        deposit: listing.security_deposit,
+        imageUrl: listing.image_url,
+        image: listing.image_url,
+        available: listing.available,
+        ownerId: owner
+          ? {
+              _id: owner.id,
+              name: owner.name,
+              isVerified: owner.is_verified,
+              rating: owner.rating,
+            }
+          : null,
+        lister: owner?.name,
+      };
+    });
 
     if (plainData.length > 0) {
       featured = plainData.slice(0, 4);
@@ -157,17 +173,19 @@ export default async function Index() {
           </div>
 
           <div className="relative order-1 md:order-2 md:col-span-5">
-            <div className="relative aspect-[3/4] overflow-hidden rounded-xl">
-              <Image
-                src="/assets/hero-lehenga.jpg"
-                alt="Editorial portrait of an Indian woman in an emerald and gold lehenga"
-                priority
-                fill
-                sizes="(max-width: 768px) 100vw, 50vw"
-                className="object-cover"
-              />
-            </div>
-            <div className="panel absolute -bottom-6 -left-4 max-w-[240px] p-5 md:-left-10">
+            <Card3D className="shadow-2xl">
+              <div className="relative aspect-[3/4] overflow-hidden rounded-xl">
+                <Image
+                  src="/assets/hero-lehenga.jpg"
+                  alt="Editorial portrait of an Indian woman in an emerald and gold lehenga"
+                  priority
+                  fill
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                  className="object-cover"
+                />
+              </div>
+            </Card3D>
+            <div className="panel absolute -bottom-6 -left-4 max-w-[240px] p-5 md:-left-10 z-30">
               <p className="eyebrow">This look</p>
               <p className="mt-1 font-display text-base leading-snug text-ink">Emerald Silk Lehenga by Deepa M.</p>
               <p className="mt-2 text-xs text-muted-foreground">Indiranagar / 2.4 km</p>

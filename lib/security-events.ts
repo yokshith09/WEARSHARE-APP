@@ -36,20 +36,23 @@ export async function recordSecurityEvent({
   metadata = {},
 }: SecurityEvent) {
   try {
+    const isUUID = (val: any) => typeof val === "string" && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(val);
+    const validActorId = isUUID(actorId) ? actorId : null;
+
     const { error } = await supabaseAdmin.from("security_events").insert({
       event_type: eventType,
       severity,
-      actor_id: actorId,
+      actor_id: validActorId,
       ip_hash: hashValue(ip),
       user_agent_hash: hashValue(userAgent),
       metadata,
     });
 
     if (error) {
-      console.error("[security-event] database write failed:", error.message);
+      console.warn("[security-event] database write warning:", error.message);
     }
   } catch (error) {
-    console.error("[security-event] database write failed:", error);
+    console.warn("[security-event] database write warning:", error);
   }
 
   if (severity === "warning" || severity === "critical") {
