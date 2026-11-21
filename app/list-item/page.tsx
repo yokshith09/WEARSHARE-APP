@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import {
   ArrowUpRight, Camera, IndianRupee, ShieldCheck, Upload, X, Sparkles, Check,
 } from "lucide-react";
@@ -130,7 +130,39 @@ function ListingForm() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [loadingAi, setLoadingAi] = useState(false);
+  const [draftRestored, setDraftRestored] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Restore draft from localStorage on initial mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("wearshare_lister_draft_v1");
+      if (saved) {
+        const d = JSON.parse(saved);
+        if (d.title) setTitle(d.title);
+        if (d.description) setDescription(d.description);
+        if (d.category) setCategory(d.category);
+        if (d.occasion) setOccasion(d.occasion);
+        if (d.size) setSize(d.size);
+        if (d.retail) setRetail(d.retail);
+        if (d.pricePerDay) setPricePerDay(d.pricePerDay);
+        if (d.deposit) setDeposit(d.deposit);
+        if (d.city) setCity(d.city);
+        if (d.pincode) setPincode(d.pincode);
+        setDraftRestored(true);
+      }
+    } catch {}
+  }, []);
+
+  // Autosave draft to localStorage
+  useEffect(() => {
+    if (!title && !description && !retail && !pricePerDay) return;
+    try {
+      localStorage.setItem("wearshare_lister_draft_v1", JSON.stringify({
+        title, description, category, occasion, size, retail, pricePerDay, deposit, city, pincode
+      }));
+    } catch {}
+  }, [title, description, category, occasion, size, retail, pricePerDay, deposit, city, pincode]);
 
   const handleAiAutofill = async () => {
     setLoadingAi(true);
@@ -163,21 +195,82 @@ function ListingForm() {
   }, [retail]);
   const suggestedDeposit = useMemo(() => {
     const r = typeof retail === "number" ? retail : 0;
-    return r > 0 ? Math.round((r * 0.18) / 100) * 100 : 0;
+    return r > 0 ? Math.round((r * 0.20) / 100) * 100 : 0;
   }, [retail]);
 
-  const onFiles = (files: FileList | null) => {
-    if (!files) return;
-    const next: string[] = [];
-    const nextFiles: File[] = [];
-    Array.from(files).slice(0, 6 - photos.length).forEach((f) => {
-      if (f.type.startsWith("image/")) {
-        next.push(URL.createObjectURL(f));
-        nextFiles.push(f);
+  // Client-side canvas compression down to max 1200px width/height and 0.82 JPEG quality (<80KB per photo)
+  const compressImageFile = (file: File, maxWidth = 1200, quality = 0.82): Promise<{ file: File; dataUrl: string }> => {
+    return new Promise((resolve) => {
+      if (!file.type.startsWith("image/")) {
+        const reader = new FileReader();
+        reader.onload = () => resolve({ file, dataUrl: String(reader.result) });
+        reader.onerror = () => resolve({ file, dataUrl: "" });
+        reader.readAsDataURL(file);
+        return;
       }
+
+      const img = document.createElement("img");
+      const objectUrl = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        let width = img.width;
+        let height = img.height;
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve({ file, dataUrl: objectUrl });
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL("image/jpeg", quality);
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              resolve({ file, dataUrl });
+              return;
+            }
+            const compressed = new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), {
+              type: "image/jpeg",
+              lastModified: Date.now(),
+            });
+            resolve({ file: compressed, dataUrl });
+          },
+          "image/jpeg",
+          quality
+        );
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        const reader = new FileReader();
+        reader.onload = () => resolve({ file, dataUrl: String(reader.result) });
+        reader.readAsDataURL(file);
+      };
+      img.src = objectUrl;
     });
-    setPhotos((p) => [...p, ...next].slice(0, 6));
-    setPhotoFiles((p) => [...p, ...nextFiles].slice(0, 6));
+  };
+
+  const onFiles = async (files: FileList | null) => {
+    if (!files) return;
+    const incoming = Array.from(files).filter((f) => f.type.startsWith("image/")).slice(0, 6 - photos.length);
+    if (incoming.length === 0) return;
+
+    for (const f of incoming) {
+      try {
+        const { file: compFile, dataUrl } = await compressImageFile(f);
+        setPhotos((p) => [...p, dataUrl].slice(0, 6));
+        setPhotoFiles((p) => [...p, compFile].slice(0, 6));
+      } catch {
+        const objectUrl = URL.createObjectURL(f);
+        setPhotos((p) => [...p, objectUrl].slice(0, 6));
+        setPhotoFiles((p) => [...p, f].slice(0, 6));
+      }
+    }
   };
 
   const removePhoto = (i: number) => {
@@ -196,26 +289,30 @@ function ListingForm() {
   const uploadPhotos = async () => {
     if (photoFiles.length === 0) return photos;
 
-    const presign = await fetch("/api/uploads/presign", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        files: photoFiles.map((file) => ({ name: file.name, contentType: file.type })),
-      }),
-    });
+    try {
+      const presign = await fetch("/api/uploads/presign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          files: photoFiles.map((file) => ({ name: file.name, contentType: file.type })),
+        }),
+      });
 
-    if (presign.ok) {
-      const data = await presign.json();
-      await Promise.all(
-        data.uploads.map((upload: any, index: number) =>
-          fetch(upload.uploadUrl, {
-            method: "PUT",
-            headers: { "Content-Type": photoFiles[index].type },
-            body: photoFiles[index],
-          })
-        )
-      );
-      return data.uploads.map((upload: any) => upload.publicUrl);
+      if (presign.ok) {
+        const data = await presign.json();
+        await Promise.all(
+          data.uploads.map((upload: any, index: number) =>
+            fetch(upload.uploadUrl, {
+              method: "PUT",
+              headers: { "Content-Type": photoFiles[index].type },
+              body: photoFiles[index],
+            })
+          )
+        );
+        return data.uploads.map((upload: any) => upload.publicUrl);
+      }
+    } catch {
+      // Fallback cleanly to compressed base64 data URLs
     }
 
     return Promise.all(photoFiles.slice(0, 3).map(fileToDataUrl));
@@ -256,6 +353,10 @@ function ListingForm() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to publish listing");
 
+      try {
+        localStorage.removeItem("wearshare_lister_draft_v1");
+      } catch {}
+
       trackEvent("listing_created", { listingId: data.id, category, size, pricePerDay });
       setSubmitted(true);
     } catch (err: any) {
@@ -265,7 +366,7 @@ function ListingForm() {
     }
   };
 
-  const canSubmit = photos.length >= 3 && title && pricePerDay && deposit;
+  const canSubmit = photos.length >= 1 && Boolean(title) && Boolean(pricePerDay) && Boolean(deposit);
 
   return (
     <>
@@ -287,10 +388,35 @@ function ListingForm() {
             onSubmit={publishListing}
             className="md:col-span-8 bg-background border border-border p-6 md:p-10 space-y-10"
           >
+            {draftRestored && (
+              <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-primary flex items-center justify-between">
+                <span>✨ Restored previous draft from your browser.</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    localStorage.removeItem("wearshare_lister_draft_v1");
+                    setDraftRestored(false);
+                    setTitle("");
+                    setDescription("");
+                    setRetail("");
+                    setPricePerDay("");
+                    setDeposit("");
+                  }}
+                  className="underline hover:text-ink font-semibold"
+                >
+                  Clear draft
+                </button>
+              </div>
+            )}
+
             {/* Photos */}
             <div>
               <div className="flex items-center justify-between">
-                <Label num="01" title="Photos" hint={`${photos.length}/6 / minimum 3 in daylight`} />
+                <Label
+                  num="01"
+                  title="Photos"
+                  hint={photos.length === 0 ? "At least 1 photo required (3+ recommended)" : `${photos.length}/6 photos selected`}
+                />
                 {photos.length > 0 && (
                   <button
                     type="button"

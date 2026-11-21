@@ -40,6 +40,11 @@ export function ListingCard({ listing, priority = false }: { listing: any; prior
                 {category}
               </span>
             )}
+            {typeof listing.distanceKm === "number" && (
+              <span className="backdrop-blur-md bg-emerald-600/90 rounded-full px-2.5 py-1 text-[10px] font-bold text-white shadow-sm flex items-center gap-1">
+                📍 {listing.distanceKm} km away
+              </span>
+            )}
             {isVerified && (
               <span className="inline-flex items-center gap-1 rounded-full bg-primary/90 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white shadow-md backdrop-blur-md">
                 <BadgeCheck className="h-3 w-3" /> Trusted Lender
@@ -67,8 +72,14 @@ export function ListingCard({ listing, priority = false }: { listing: any; prior
             <h3 className="truncate font-display text-lg font-medium leading-tight text-ink transition-colors group-hover:text-primary">
               {title}
             </h3>
-            <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-              <MapPin className="h-3 w-3" /> {location}
+            <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+              <MapPin className="h-3 w-3 shrink-0" />
+              <span className="truncate">{location}</span>
+              {typeof listing.distanceKm === "number" && (
+                <span className="shrink-0 font-medium text-emerald-700 dark:text-emerald-400">
+                  • {listing.distanceKm} km
+                </span>
+              )}
             </p>
           </div>
           <div className="shrink-0 text-right">

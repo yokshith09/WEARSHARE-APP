@@ -82,6 +82,7 @@ function BrowseContent() {
   const [trustedOnly, setTrustedOnly] = useState(false);
   const [apiListings, setApiListings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [autoExpanded, setAutoExpanded] = useState(false);
   const railRef = useRef<HTMLDivElement>(null);
 
   const scrollRail = (direction: number) => {
@@ -96,14 +97,25 @@ function BrowseContent() {
   }, [rawCategoryParam]);
 
   useEffect(() => {
-    fetch('/api/listings')
-      .then(res => res.json())
-      .then(data => {
+    setLoading(true);
+    const params = new URLSearchParams();
+    if (pincode && pincode.length === 6) {
+      params.set('originPincode', pincode);
+      if (maxKm !== 999) {
+        params.set('maxRadius', String(maxKm));
+      }
+    }
+    const url = `/api/listings${params.toString() ? `?${params.toString()}` : ''}`;
+    fetch(url)
+      .then(async (res) => {
+        const isAuto = res.headers.get('x-wearshare-auto-expanded') === 'true';
+        setAutoExpanded(isAuto);
+        const data = await res.json();
         setApiListings(Array.isArray(data) ? data : []);
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, []);
+  }, [pincode, maxKm]);
 
   const activeCategoryList = useMemo(() => {
     if (collection === "Women") return womenCategories;
@@ -122,7 +134,8 @@ function BrowseContent() {
           const listingGender = (l.gender || 'Unisex').toLowerCase();
           const listingCity = l.city || l.area || "Bengaluru";
           const listingPincode = String(l.pincode || "");
-          const distanceKm = l.distanceKm || 0;
+          const hasDistance = typeof l.distanceKm === "number";
+          const distanceKm = hasDistance ? l.distanceKm : 0;
           const catLower = listingCat.toLowerCase();
           const text = `${l.title || l.name || ""} ${l.description || ""} ${listingCat} ${listingOcc} ${l.gender || ""}`.toLowerCase();
 
@@ -158,13 +171,13 @@ function BrowseContent() {
           const matchesSize = size === "All" || l.size === size || l.size === "Free";
 
           // 6. Distance Filter
-          const matchesDistance = distanceKm <= maxKm;
+          const matchesDistance = hasDistance ? (distanceKm <= maxKm || autoExpanded) : (maxKm === 999);
 
           // 7. Trusted Filter
           const matchesTrusted = !trustedOnly || isVerified;
 
-          // 8. Pincode Filter
-          const matchesPincode = !pincode || listingPincode.includes(pincode.replace(/\D/g, ""));
+          // 8. Pincode Filter: If distance calculated for 6-digit origin, allow radius matches across neighborhoods
+          const matchesPincode = !pincode || (pincode.length === 6 && hasDistance) || listingPincode.includes(pincode.replace(/\D/g, ""));
 
           // 9. Search Term
           const matchesSearch = !searchTerm || text.includes(searchTerm.toLowerCase());
@@ -188,8 +201,8 @@ function BrowseContent() {
       ).sort((a, b) => {
         const aPrice = a.rentalPricePerDay || a.pricePerDay || 0;
         const bPrice = b.rentalPricePerDay || b.pricePerDay || 0;
-        const aDist = a.distanceKm || 0;
-        const bDist = b.distanceKm || 0;
+        const aDist = typeof a.distanceKm === "number" ? a.distanceKm : 999;
+        const bDist = typeof b.distanceKm === "number" ? b.distanceKm : 999;
         const aRating = a.ownerId?.rating || a.rating || 0;
         const bRating = b.ownerId?.rating || b.rating || 0;
         const aVerified = a.ownerId?.isVerified || a.verified;
@@ -200,7 +213,7 @@ function BrowseContent() {
         if (sort === "Top rated") return bRating - aRating;
         return Number(bVerified) - Number(aVerified) || bRating - aRating;
       }),
-    [apiListings, collection, cat, city, occ, size, maxKm, date, sort, trustedOnly, searchTerm, pincode],
+    [apiListings, collection, cat, city, occ, size, maxKm, autoExpanded, date, sort, trustedOnly, searchTerm, pincode],
   );
 
   useEffect(() => {
@@ -449,6 +462,23 @@ function BrowseContent() {
 
       {/* Grid of Listings */}
       <section className="container-edit py-14">
+        {autoExpanded && pincode.length === 6 && maxKm < 999 && (
+          <div className="mb-8 rounded-xl border border-amber-300 bg-amber-50/80 p-4 text-xs text-amber-900 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <MapPin className="h-4 w-4 text-amber-700 shrink-0" />
+              <span>
+                No outfits found within <strong>{maxKm} km</strong> of pincode <strong>{pincode}</strong>.
+                Showing closest available outfits across the city.
+              </span>
+            </div>
+            <button
+              onClick={() => setMaxKm(999)}
+              className="font-semibold text-amber-800 underline hover:text-amber-950 shrink-0 text-left sm:text-right"
+            >
+              Reset radius limit
+            </button>
+          </div>
+        )}
         {loading ? (
           <div className="text-center py-20 text-muted-foreground">Loading outfits...</div>
         ) : filtered.length === 0 ? (

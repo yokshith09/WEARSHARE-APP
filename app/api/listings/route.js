@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getServerSession } from 'next-auth'
 import { authOptions } from "@/lib/authOptions"
+import { calculatePincodeDistanceKm, isValidPincode } from "@/lib/geo"
 
 export async function GET(request) {
   try {
@@ -15,7 +16,9 @@ export async function GET(request) {
     const gender = searchParams.get('gender')
     const occasion = searchParams.get('occasion')
     const city = searchParams.get('city')
-    const pincode = searchParams.get('pincode')
+    const originPincode = searchParams.get('originPincode') || searchParams.get('pincode')
+    const maxRadiusParam = searchParams.get('maxRadius') || searchParams.get('radius')
+    const maxRadius = maxRadiusParam && !isNaN(Number(maxRadiusParam)) ? Number(maxRadiusParam) : null
     const userOnly = searchParams.get('user') || searchParams.get('mine')
 
     const limitParam = parseInt(searchParams.get('limit') || '50', 10)
@@ -68,7 +71,10 @@ export async function GET(request) {
     if (gender && gender.toLowerCase() !== 'all') query = query.ilike('gender', `%${gender}%`)
     if (occasion && occasion.toLowerCase() !== 'all') query = query.ilike('occasion', `%${occasion}%`)
     if (city && city.toLowerCase() !== 'all') query = query.ilike('city', `%${city}%`)
-    if (pincode && pincode.trim()) query = query.ilike('pincode', `%${pincode.trim()}%`)
+    // Only apply strict SQL pincode filter if originPincode is NOT being used for distance calculation
+    if (!originPincode && searchParams.get('pincode')?.trim()) {
+      query = query.ilike('pincode', `%${searchParams.get('pincode').trim()}%`)
+    }
     if (minPrice) query = query.gte('rental_price_per_day', Number(minPrice))
     if (maxPrice) query = query.lte('rental_price_per_day', Number(maxPrice))
     if (search) {
@@ -80,38 +86,42 @@ export async function GET(request) {
     try {
       const { data: listings, error } = await query;
       if (!error && Array.isArray(listings) && listings.length > 0) {
-        mappedListings = listings.map(l => ({
-          _id: l.id,
-          id: l.id,
-          name: l.title,
-          title: l.title,
-          description: l.description,
-          category: l.category,
-          occasion: l.occasion,
-          gender: l.gender || 'Unisex',
-          listingType: l.listing_type,
-          size: l.size,
-          condition: l.condition,
-          rentalPricePerDay: l.rental_price_per_day,
-          pricePerDay: l.rental_price_per_day,
-          securityDeposit: l.security_deposit,
-          deposit: l.security_deposit,
-          imageUrl: l.image_url,
-          photoUrls: l.photo_urls || (l.image_url ? [l.image_url] : []),
-          image: l.image_url,
-          city: l.city,
-          pincode: l.pincode,
-          area: l.area,
-          retailPrice: l.retail_price,
-          available: l.available,
-          ownerId: l.owner ? {
-            _id: l.owner.id,
-            name: l.owner.name,
-            isVerified: l.owner.is_verified,
-            rating: l.owner.rating
-          } : null,
-          lister: l.owner?.name
-        }));
+        mappedListings = listings.map(l => {
+          const distanceKm = originPincode && l.pincode ? calculatePincodeDistanceKm(originPincode, l.pincode) : null;
+          return {
+            _id: l.id,
+            id: l.id,
+            name: l.title,
+            title: l.title,
+            description: l.description,
+            category: l.category,
+            occasion: l.occasion,
+            gender: l.gender || 'Unisex',
+            listingType: l.listing_type,
+            size: l.size,
+            condition: l.condition,
+            rentalPricePerDay: l.rental_price_per_day,
+            pricePerDay: l.rental_price_per_day,
+            securityDeposit: l.security_deposit,
+            deposit: l.security_deposit,
+            imageUrl: l.image_url,
+            photoUrls: l.photo_urls || (l.image_url ? [l.image_url] : []),
+            image: l.image_url,
+            city: l.city,
+            pincode: l.pincode,
+            area: l.area,
+            distanceKm,
+            retailPrice: l.retail_price,
+            available: l.available,
+            ownerId: l.owner ? {
+              _id: l.owner.id,
+              name: l.owner.name,
+              isVerified: l.owner.is_verified,
+              rating: l.owner.rating
+            } : null,
+            lister: l.owner?.name
+          };
+        });
       }
     } catch (dbErr) {
       console.warn('[Listings API] Supabase query warning:', dbErr.message);
@@ -142,8 +152,8 @@ export async function GET(request) {
       if (city && city.toLowerCase() !== 'all') {
         filteredCatalog = filteredCatalog.filter(l => l.city.toLowerCase().includes(city.toLowerCase()));
       }
-      if (pincode) {
-        filteredCatalog = filteredCatalog.filter(l => String(l.pincode || '').includes(pincode));
+      if (!originPincode && searchParams.get('pincode')) {
+        filteredCatalog = filteredCatalog.filter(l => String(l.pincode || '').includes(searchParams.get('pincode')));
       }
       if (search) {
         const s = search.toLowerCase();
@@ -155,39 +165,75 @@ export async function GET(request) {
         );
       }
 
-      mappedListings = filteredCatalog.map(l => ({
-        _id: l.id,
-        id: l.id,
-        name: l.title,
-        title: l.title,
-        description: `${l.occasion} wear available for rent in ${l.area}, ${l.city}`,
-        category: l.category,
-        occasion: l.occasion,
-        gender: l.gender || 'Unisex',
-        size: l.size,
-        condition: 'Like New',
-        rentalPricePerDay: l.pricePerDay,
-        pricePerDay: l.pricePerDay,
-        securityDeposit: l.deposit,
-        deposit: l.deposit,
-        imageUrl: l.image,
-        photoUrls: [l.image],
-        image: l.image,
-        city: l.city,
-        area: l.area,
-        retailPrice: l.retailPrice,
-        available: true,
-        ownerId: {
-          _id: 'owner-sample',
-          name: l.lister,
-          isVerified: l.verified,
-          rating: l.rating
-        },
-        lister: l.lister
-      }));
+      mappedListings = filteredCatalog.map(l => {
+        const distanceKm = originPincode && l.pincode ? calculatePincodeDistanceKm(originPincode, l.pincode) : null;
+        return {
+          _id: l.id,
+          id: l.id,
+          name: l.title,
+          title: l.title,
+          description: `${l.occasion} wear available for rent in ${l.area}, ${l.city}`,
+          category: l.category,
+          occasion: l.occasion,
+          gender: l.gender || 'Unisex',
+          size: l.size,
+          condition: 'Like New',
+          rentalPricePerDay: l.pricePerDay,
+          pricePerDay: l.pricePerDay,
+          securityDeposit: l.deposit,
+          deposit: l.deposit,
+          imageUrl: l.image,
+          photoUrls: [l.image],
+          image: l.image,
+          city: l.city,
+          area: l.area,
+          pincode: l.pincode,
+          distanceKm,
+          retailPrice: l.retailPrice,
+          available: true,
+          ownerId: {
+            _id: 'owner-sample',
+            name: l.lister,
+            isVerified: l.verified,
+            rating: l.rating
+          },
+          lister: l.lister
+        };
+      });
     }
 
-    return NextResponse.json(mappedListings);
+    let results = mappedListings;
+    let autoExpanded = false;
+
+    // Radius filter with auto-expansion fallback
+    if (originPincode && maxRadius && maxRadius < 999) {
+      const withinRadius = mappedListings.filter(l => typeof l.distanceKm === 'number' && l.distanceKm <= maxRadius);
+      if (withinRadius.length > 0) {
+        results = withinRadius;
+      } else {
+        // Auto-expand so user is not stuck with empty results
+        autoExpanded = true;
+        results = mappedListings;
+      }
+    }
+
+    // Sort by proximity when originPincode is specified
+    if (originPincode) {
+      results.sort((a, b) => {
+        if (typeof a.distanceKm === 'number' && typeof b.distanceKm === 'number') {
+          return a.distanceKm - b.distanceKm;
+        }
+        if (typeof a.distanceKm === 'number') return -1;
+        if (typeof b.distanceKm === 'number') return 1;
+        return 0;
+      });
+    }
+
+    const response = NextResponse.json(results);
+    if (autoExpanded) {
+      response.headers.set('x-wearshare-auto-expanded', 'true');
+    }
+    return response;
   } catch (err) {
     console.error(err)
     return NextResponse.json({ error: err.message }, { status: 500 })

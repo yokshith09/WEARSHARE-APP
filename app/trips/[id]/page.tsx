@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { getListing, inr } from "@/lib/listings";
 import { useParams, useSearchParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 
 type Stage = "requested" | "approved" | "picked_up" | "returned";
 
@@ -39,6 +40,8 @@ const RETURN_CHECKLIST = [
 export default function TripPage() {
   const params = useParams();
   const searchParams = useSearchParams();
+  const { data: session } = useSession();
+  const currentUserId = (session?.user as any)?.id;
   const id = params.id as string;
   const role = searchParams.get("role") === "lister" ? "lister" : "renter";
   const fallbackListing = useMemo(() => getListing(id), [id]);
@@ -65,6 +68,38 @@ export default function TripPage() {
   const [draft, setDraft] = useState("");
   const [actionsOpen, setActionsOpen] = useState(false);
   const chatPhotoRef = useRef<HTMLInputElement>(null);
+
+  // Dynamic message fetcher with participant mapping
+  const fetchMessages = async () => {
+    try {
+      const res = await fetch(`/api/trips/${id}/messages`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (Array.isArray(data.messages) && data.messages.length > 0) {
+        const mapped: Msg[] = data.messages.map((m: any) => ({
+          id: m.id,
+          from: m.sender_id === currentUserId ? "me" : "lister",
+          kind: (m.kind || "text") as any,
+          time: new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          text: m.content,
+          title: m.metadata?.title || (m.kind === "pickup" ? "Pickup address" : "Address"),
+          address: m.metadata?.address || m.content,
+          window: m.metadata?.window || "",
+          photos: m.metadata?.photos || [],
+          caption: m.metadata?.caption || "",
+        }));
+        setMessages(mapped);
+      }
+    } catch {
+      // Quiet fallback
+    }
+  };
+
+  useEffect(() => {
+    fetchMessages();
+    const interval = setInterval(fetchMessages, 5000);
+    return () => clearInterval(interval);
+  }, [id, currentUserId]);
 
   useEffect(() => {
     if (fallbackListing) {
@@ -114,32 +149,38 @@ export default function TripPage() {
   useEffect(() => {
     if (!listing) return;
     const preBooking = Boolean(listing.preBooking);
-    setMessages([
-      {
-        id: "m1",
-        from: preBooking ? "me" : "lister",
-        kind: "text",
-        time: "10:24 AM",
-        text: preBooking
-          ? `Hi! I'm interested in ${listing.title}. Is it available for my dates?`
-          : `Hi! Booking confirmed. Pickup is at my place in ${listing.area || ""} - anytime between 6-9pm Friday works.`,
-      },
-      {
-        id: "m2",
-        from: "lister",
-        kind: "address",
-        time: "10:24 AM",
-        title: "Pickup address",
-        address: `2nd Floor, 12th Main, ${listing.area || ""}, ${listing.city || ""} 560038`,
-        window: "Friday / 6:00 - 9:00 PM",
-      },
-      ...(preBooking
-        ? [{ id: "m3", from: "lister" as const, kind: "text" as const, time: "10:25 AM", text: "Yes, message me your preferred pickup and return dates." }]
-        : [
-            { id: "m3", from: "me" as const, kind: "text" as const, time: "10:31 AM", text: "Perfect, I'll come around 7pm. Should I bring an ID?" },
-            { id: "m4", from: "lister" as const, kind: "text" as const, time: "10:33 AM", text: "Yes please, just for verification at handover. I'll have it steam-pressed and bagged." },
-          ]),
-    ]);
+    setMessages((prev) => {
+      // If we already received real DB messages, do not overwrite with static greeting
+      if (prev.some((m) => m.id.startsWith("msg-") || m.id.length > 10)) {
+        return prev;
+      }
+      return [
+        {
+          id: "m1",
+          from: preBooking ? "me" : "lister",
+          kind: "text",
+          time: "10:24 AM",
+          text: preBooking
+            ? `Hi! I'm interested in ${listing.title}. Is it available for my dates?`
+            : `Hi! Booking confirmed. Pickup is at my place in ${listing.area || ""} - anytime between 6-9pm Friday works.`,
+        },
+        {
+          id: "m2",
+          from: "lister",
+          kind: "address",
+          time: "10:24 AM",
+          title: "Pickup address",
+          address: `2nd Floor, 12th Main, ${listing.area || ""}, ${listing.city || ""} 560038`,
+          window: "Friday / 6:00 - 9:00 PM",
+        },
+        ...(preBooking
+          ? [{ id: "m3", from: "lister" as const, kind: "text" as const, time: "10:25 AM", text: "Yes, message me your preferred pickup and return dates." }]
+          : [
+              { id: "m3", from: "me" as const, kind: "text" as const, time: "10:31 AM", text: "Perfect, I'll come around 7pm. Should I bring an ID?" },
+              { id: "m4", from: "lister" as const, kind: "text" as const, time: "10:33 AM", text: "Yes please, just for verification at handover. I'll have it steam-pressed and bagged." },
+            ]),
+      ];
+    });
   }, [listing]);
 
   if (checkingListing) return <div className="p-20 text-center text-muted-foreground">Opening conversation...</div>;
@@ -149,7 +190,7 @@ export default function TripPage() {
     if (!draft.trim()) return;
     const textToSend = draft.trim();
     setDraft("");
-    setMessages((m) => [...m, { id: `m${m.length + 1}`, from: "me", kind: "text", time: "Just now", text: textToSend }]);
+    setMessages((m) => [...m, { id: `m-${Date.now()}`, from: "me", kind: "text", time: "Just now", text: textToSend }]);
 
     try {
       await fetch(`/api/trips/${id}/messages`, {
@@ -160,25 +201,43 @@ export default function TripPage() {
           kind: "text",
         }),
       });
+      fetchMessages();
     } catch (e) {
       console.error("[Trip message send error]", e);
     }
   };
 
-  const shareAddressCard = (kind: "pickup" | "return") => {
+  const shareAddressCard = async (kind: "pickup" | "return") => {
+    const address = `2nd Floor, 12th Main, ${listing.area || "Koramangala"}, ${listing.city || "Bengaluru"} 560038`;
+    const win = kind === "pickup" ? "Friday / 6:00 - 9:00 PM" : "Sunday / 5:00 - 8:00 PM";
+    const title = kind === "pickup" ? "Pickup address" : "Return address";
+
     setMessages((m) => [
       ...m,
       {
-        id: `m${m.length + 1}`,
+        id: `m-${Date.now()}`,
         from: "me",
         kind: "address",
-        time: "now",
-        title: kind === "pickup" ? "Pickup address" : "Return address",
-        address: `2nd Floor, 12th Main, ${listing.area}, ${listing.city} 560038`,
-        window: kind === "pickup" ? "Friday / 6:00 - 9:00 PM" : "Sunday / 5:00 - 8:00 PM",
+        time: "Just now",
+        title,
+        address,
+        window: win,
       },
     ]);
     setActionsOpen(false);
+
+    try {
+      await fetch(`/api/trips/${id}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content: `${title}: ${address} (${win})`,
+          kind: "address",
+          metadata: { title, address, window: win },
+        }),
+      });
+      fetchMessages();
+    } catch {}
   };
 
   const sendChatPhotos = (files: FileList | null) => {
