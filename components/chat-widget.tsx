@@ -16,14 +16,25 @@ export function ChatWidget() {
   const [input, setInput] = useState("");
   const [language, setLanguage] = useState<"en-IN" | "hi-IN">("en-IN");
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const sessionId = useMemo(() => {
-    if (typeof window === "undefined") return "wearshare-default";
-    const key = "wearshare_chat_session_id";
-    const existing = localStorage.getItem(key);
-    if (existing) return existing;
-    const id = crypto.randomUUID();
-    localStorage.setItem(key, id);
-    return id;
+  const [sessionId, setSessionId] = useState("wearshare-default");
+
+  useEffect(() => {
+    try {
+      if (typeof window === "undefined") return;
+      const key = "wearshare_chat_session_id";
+      const existing = localStorage.getItem(key);
+      if (existing) {
+        setSessionId(existing);
+      } else {
+        const id = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : `session-${Date.now()}`;
+        localStorage.setItem(key, id);
+        setSessionId(id);
+      }
+    } catch {
+      // Safe fallback if localStorage is blocked or restricted
+    }
   }, []);
 
   const { messages, isStreaming, send, stop, setMessages } = useStreamChat(sessionId);

@@ -16,17 +16,33 @@ export function ScrollReveal({
   className = "",
   delayMs = 0,
   direction = "up",
-  distance = 28,
-  duration = 0.75,
+  distance = 24,
+  duration = 0.65,
 }: ScrollRevealProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const [isVisible, setIsVisible] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
+    setMounted(true);
     const el = ref.current;
     if (!el) return;
 
-    if (typeof window === "undefined" || !("IntersectionObserver" in window)) {
+    if (
+      typeof window === "undefined" ||
+      !("IntersectionObserver" in window) ||
+      (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches)
+    ) {
+      setIsVisible(true);
+      return;
+    }
+
+    // Check if element is already in or near viewport on mount
+    const rect = el.getBoundingClientRect();
+    if (rect.top > window.innerHeight + 50) {
+      // Only hide if genuinely below the viewport fold
+      setIsVisible(false);
+    } else {
       setIsVisible(true);
       return;
     }
@@ -39,17 +55,26 @@ export function ScrollReveal({
         }
       },
       {
-        threshold: 0.12,
-        rootMargin: "0px 0px -40px 0px",
+        threshold: 0.01,
+        rootMargin: "0px 0px 80px 0px",
       }
     );
 
     observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
+
+    // Safety fallback: ensure nothing stays permanently hidden
+    const timer = setTimeout(() => {
+      setIsVisible(true);
+    }, Math.max(delayMs + 400, 600));
+
+    return () => {
+      observer.disconnect();
+      clearTimeout(timer);
+    };
+  }, [delayMs]);
 
   const getTransform = () => {
-    if (isVisible) return "translate3d(0, 0, 0) scale(1)";
+    if (!mounted || isVisible) return "none";
     switch (direction) {
       case "up":
         return `translate3d(0, ${distance}px, 0)`;
@@ -71,9 +96,11 @@ export function ScrollReveal({
     <div
       ref={ref}
       style={{
-        opacity: isVisible ? 1 : 0,
+        opacity: !mounted || isVisible ? 1 : 0,
         transform: getTransform(),
-        transition: `opacity ${duration}s cubic-bezier(0.16, 1, 0.3, 1) ${delayMs}ms, transform ${duration}s cubic-bezier(0.16, 1, 0.3, 1) ${delayMs}ms`,
+        transition: mounted
+          ? `opacity ${duration}s cubic-bezier(0.16, 1, 0.3, 1) ${delayMs}ms, transform ${duration}s cubic-bezier(0.16, 1, 0.3, 1) ${delayMs}ms`
+          : "none",
         willChange: "opacity, transform",
       }}
       className={className}

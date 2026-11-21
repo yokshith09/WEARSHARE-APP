@@ -151,7 +151,7 @@ function ListingForm() {
         if (d.pincode) setPincode(d.pincode);
         setDraftRestored(true);
       }
-    } catch {}
+    } catch { }
   }, []);
 
   // Autosave draft to localStorage
@@ -161,7 +161,7 @@ function ListingForm() {
       localStorage.setItem("wearshare_lister_draft_v1", JSON.stringify({
         title, description, category, occasion, size, retail, pricePerDay, deposit, city, pincode
       }));
-    } catch {}
+    } catch { }
   }, [title, description, category, occasion, size, retail, pricePerDay, deposit, city, pincode]);
 
   const handleAiAutofill = async () => {
@@ -355,7 +355,7 @@ function ListingForm() {
 
       try {
         localStorage.removeItem("wearshare_lister_draft_v1");
-      } catch {}
+      } catch { }
 
       trackEvent("listing_created", { listingId: data.id, category, size, pricePerDay });
       setSubmitted(true);
@@ -370,325 +370,325 @@ function ListingForm() {
 
   return (
     <>
-    <section id="new-listing" className="bg-secondary/40 py-20 md:py-24 border-y border-border">
-      <div className="container-edit">
-        <div className="grid md:grid-cols-12 gap-10">
-          <div className="md:col-span-4">
-            <p className="eyebrow">Step by step</p>
-            <h2 className="font-display text-4xl md:text-5xl mt-3 text-ink leading-tight">
-              List your<br /><span className="italic text-primary">first piece.</span>
-            </h2>
-            <p className="mt-5 text-muted-foreground text-sm leading-relaxed">
-              Three photos, a fair price, and the dates you're free for pickup. That's it.
-              You can edit anything later.
-            </p>
-          </div>
-
-          <form
-            onSubmit={publishListing}
-            className="md:col-span-8 bg-background border border-border p-6 md:p-10 space-y-10"
-          >
-            {draftRestored && (
-              <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-primary flex items-center justify-between">
-                <span>✨ Restored previous draft from your browser.</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    localStorage.removeItem("wearshare_lister_draft_v1");
-                    setDraftRestored(false);
-                    setTitle("");
-                    setDescription("");
-                    setRetail("");
-                    setPricePerDay("");
-                    setDeposit("");
-                  }}
-                  className="underline hover:text-ink font-semibold"
-                >
-                  Clear draft
-                </button>
-              </div>
-            )}
-
-            {/* Photos */}
-            <div>
-              <div className="flex items-center justify-between">
-                <Label
-                  num="01"
-                  title="Photos"
-                  hint={photos.length === 0 ? "At least 1 photo required (3+ recommended)" : `${photos.length}/6 photos selected`}
-                />
-                {photos.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={handleAiAutofill}
-                    disabled={loadingAi}
-                    className="flex items-center gap-2 bg-primary/10 text-primary hover:bg-primary/20 px-3 py-1.5 rounded-full text-xs font-medium transition-colors"
-                  >
-                    {loadingAi ? (
-                      <span className="flex items-center gap-2">
-                        <Sparkles className="h-3.5 w-3.5 animate-pulse" /> Analyzing...
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-2">
-                        <Sparkles className="h-3.5 w-3.5" /> Auto-fill with AI
-                      </span>
-                    )}
-                  </button>
-                )}
-              </div>
-              <div className="mt-4 grid grid-cols-3 gap-3">
-                {photos.map((src, i) => (
-                  <div key={i} className="relative aspect-square overflow-hidden bg-muted group">
-                    <img src={src} alt={`upload ${i + 1}`} className="h-full w-full object-cover" />
-                    {i === 0 && (
-                      <span className="absolute top-1 left-1 bg-ink text-cream text-[9px] uppercase tracking-widest px-1.5 py-0.5">Cover</span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => removePhoto(i)}
-                      className="absolute top-1 right-1 h-6 w-6 bg-cream/90 text-ink rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
-                      aria-label="Remove photo"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                ))}
-                {photos.length < 6 && (
-                  <button
-                    type="button"
-                    onClick={() => fileRef.current?.click()}
-                    className="aspect-square border border-dashed border-border hover:border-primary text-muted-foreground hover:text-primary flex flex-col items-center justify-center gap-1 transition"
-                  >
-                    <Upload className="h-5 w-5" />
-                    <span className="text-[11px] uppercase tracking-widest">Add</span>
-                  </button>
-                )}
-              </div>
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={(e) => onFiles(e.target.files)}
-              />
-            </div>
-
-            {/* Basics */}
-            <div>
-              <Label num="02" title="The piece" hint="Title, category, size" />
-              <div className="mt-4 grid sm:grid-cols-2 gap-4">
-                <Field label="Title">
-                  <input
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value.slice(0, 80))}
-                    placeholder="e.g. Emerald silk lehenga"
-                    className="form-input"
-                    required
-                  />
-                </Field>
-                <Field label="Category">
-                  <select value={category} onChange={(e) => setCategory(e.target.value)} className="form-input">
-                    {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
-                  </select>
-                </Field>
-                <Field label="Occasion">
-                  <select value={occasion} onChange={(e) => setOccasion(e.target.value)} className="form-input">
-                    {["Wedding", "Reception", "Sangeet", "Cocktail", "Festival", "Formal", "Casual"].map((c) => <option key={c}>{c}</option>)}
-                  </select>
-                </Field>
-                <Field label="Pincode">
-                  <input
-                    value={pincode}
-                    onChange={(e) => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    placeholder="e.g. 560038"
-                    className="form-input"
-                    required
-                  />
-                </Field>
-                <Field label="City">
-                  <select value={city} onChange={(e) => setCity(e.target.value)} className="form-input">
-                    {CITIES.map((c) => <option key={c}>{c}</option>)}
-                  </select>
-                </Field>
-                <Field label="Size">
-                  <div className="flex gap-1.5 flex-wrap">
-                    {SIZES.map((s) => (
-                      <button
-                        key={s}
-                        type="button"
-                        onClick={() => setSize(s)}
-                        className={`text-xs px-3 py-2 border ${size === s ? "bg-ink text-cream border-ink" : "border-border text-ink hover:border-ink"}`}
-                      >
-                        {s}
-                      </button>
-                    ))}
-                  </div>
-                </Field>
-                <Field label="Description">
-                  <textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value.slice(0, 500))}
-                    placeholder="Fabric, fit, includes, and care notes"
-                    className="form-input min-h-24"
-                  />
-                </Field>
-                <Field label="Retail price (₹)">
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    min={0}
-                    value={retail}
-                    onChange={(e) => setRetail(e.target.value === "" ? "" : Number(e.target.value))}
-                    placeholder="32000"
-                    className="form-input"
-                  />
-                </Field>
-              </div>
-            </div>
-
-            {/* Pricing */}
-            <div>
-              <Label num="03" title="Pricing" hint="Set your daily rate and deposit" />
-              {suggestedPrice > 0 && (
-                <div className="mt-3 flex items-start gap-2 text-xs text-primary bg-primary/5 border border-primary/20 px-3 py-2">
-                  <Sparkles className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                  <span>
-                    Based on similar pieces, we suggest <strong>₹{suggestedPrice}/day</strong> with a{" "}
-                    <strong>₹{suggestedDeposit}</strong> refundable deposit.{" "}
-                    <button
-                      type="button"
-                      onClick={() => { setPricePerDay(suggestedPrice); setDeposit(suggestedDeposit); }}
-                      className="underline ml-1"
-                    >
-                      Apply
-                    </button>
-                  </span>
-                </div>
-              )}
-              <div className="mt-4 grid sm:grid-cols-2 gap-4">
-                <Field label="Price per day (₹)">
-                  <input
-                    type="number"
-                    min={0}
-                    value={pricePerDay}
-                    onChange={(e) => setPricePerDay(e.target.value === "" ? "" : Number(e.target.value))}
-                    placeholder="1500"
-                    className="form-input"
-                    required
-                  />
-                </Field>
-                <Field label="Refundable deposit (₹)">
-                  <input
-                    type="number"
-                    min={0}
-                    value={deposit}
-                    onChange={(e) => setDeposit(e.target.value === "" ? "" : Number(e.target.value))}
-                    placeholder="5000"
-                    className="form-input"
-                    required
-                  />
-                </Field>
-              </div>
-              <p className="mt-2 text-[11px] text-muted-foreground">
-                WearShare keeps a 15% commission. You see the net payout before publishing.
+      <section id="new-listing" className="bg-secondary/40 py-20 md:py-24 border-y border-border">
+        <div className="container-edit">
+          <div className="grid md:grid-cols-12 gap-10">
+            <div className="md:col-span-4">
+              <p className="eyebrow">Step by step</p>
+              <h2 className="font-display text-4xl md:text-5xl mt-3 text-ink leading-tight">
+                List your<br /><span className="italic text-primary">first piece.</span>
+              </h2>
+              <p className="mt-5 text-muted-foreground text-sm leading-relaxed">
+                Three photos, a fair price, and the dates you're free for pickup. That's it.
+                You can edit anything later.
               </p>
             </div>
 
-            {/* Availability calendar */}
-            <div>
-              <Label num="04" title="Availability" hint="Tap dates you're NOT available" />
-              <div className="mt-4 flex flex-col md:flex-row gap-6">
-                <div className="border border-border bg-background">
-                  <Calendar
-                    mode="multiple"
-                    selected={unavailable}
-                    onSelect={setUnavailable}
-                    disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0))}
-                    className="p-3 pointer-events-auto"
-                  />
+            <form
+              onSubmit={publishListing}
+              className="md:col-span-8 bg-background border border-border p-6 md:p-10 space-y-10"
+            >
+              {draftRestored && (
+                <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-primary flex items-center justify-between">
+                  <span>✨ Restored previous draft from your browser.</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      localStorage.removeItem("wearshare_lister_draft_v1");
+                      setDraftRestored(false);
+                      setTitle("");
+                      setDescription("");
+                      setRetail("");
+                      setPricePerDay("");
+                      setDeposit("");
+                    }}
+                    className="underline hover:text-ink font-semibold"
+                  >
+                    Clear draft
+                  </button>
                 </div>
-                <div className="text-sm flex-1">
-                  <p className="eyebrow">Blocked dates</p>
-                  {unavailable && unavailable.length > 0 ? (
-                    <ul className="mt-3 flex flex-wrap gap-1.5">
-                      {unavailable
-                        .slice()
-                        .sort((a, b) => a.getTime() - b.getTime())
-                        .map((d) => (
-                          <li key={d.toISOString()} className="text-xs bg-ink text-cream px-2 py-1">
-                            {d.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
-                          </li>
-                        ))}
-                    </ul>
-                  ) : (
-                    <p className="mt-3 text-muted-foreground text-xs">Open every day. Renters can request any date.</p>
+              )}
+
+              {/* Photos */}
+              <div>
+                <div className="flex items-center justify-between">
+                  <Label
+                    num="01"
+                    title="Photos"
+                    hint={photos.length === 0 ? "At least 1 photo required (3+ recommended)" : `${photos.length}/6 photos selected`}
+                  />
+                  {photos.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleAiAutofill}
+                      disabled={loadingAi}
+                      className="flex items-center gap-2 bg-primary/10 text-primary hover:bg-primary/20 px-3 py-1.5 rounded-full text-xs font-medium transition-colors"
+                    >
+                      {loadingAi ? (
+                        <span className="flex items-center gap-2">
+                          <Sparkles className="h-3.5 w-3.5 animate-pulse" /> Analyzing...
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-2">
+                          <Sparkles className="h-3.5 w-3.5" /> Auto-fill with AI
+                        </span>
+                      )}
+                    </button>
                   )}
                 </div>
+                <div className="mt-4 grid grid-cols-3 gap-3">
+                  {photos.map((src, i) => (
+                    <div key={i} className="relative aspect-square overflow-hidden bg-muted group">
+                      <img src={src} alt={`upload ${i + 1}`} className="h-full w-full object-cover" />
+                      {i === 0 && (
+                        <span className="absolute top-1 left-1 bg-ink text-cream text-[9px] uppercase tracking-widest px-1.5 py-0.5">Cover</span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => removePhoto(i)}
+                        className="absolute top-1 right-1 h-6 w-6 bg-cream/90 text-ink rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
+                        aria-label="Remove photo"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                  {photos.length < 6 && (
+                    <button
+                      type="button"
+                      onClick={() => fileRef.current?.click()}
+                      className="aspect-square border border-dashed border-border hover:border-primary text-muted-foreground hover:text-primary flex flex-col items-center justify-center gap-1 transition"
+                    >
+                      <Upload className="h-5 w-5" />
+                      <span className="text-[11px] uppercase tracking-widest">Add</span>
+                    </button>
+                  )}
+                </div>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => onFiles(e.target.files)}
+                />
               </div>
-            </div>
 
-            {/* Submit */}
-            <div className="hairline pt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              {/* Basics */}
               <div>
-                <p className="text-xs text-muted-foreground">
-                  By listing, you agree to WearShare's{" "}
-                  <Link href="/how-it-works" className="underline">trust & safety policy</Link>.
-                </p>
-                {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+                <Label num="02" title="The piece" hint="Title, category, size" />
+                <div className="mt-4 grid sm:grid-cols-2 gap-4">
+                  <Field label="Title">
+                    <input
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value.slice(0, 80))}
+                      placeholder="e.g. Emerald silk lehenga"
+                      className="form-input"
+                      required
+                    />
+                  </Field>
+                  <Field label="Category">
+                    <select value={category} onChange={(e) => setCategory(e.target.value)} className="form-input">
+                      {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Occasion">
+                    <select value={occasion} onChange={(e) => setOccasion(e.target.value)} className="form-input">
+                      {["Wedding", "Reception", "Sangeet", "Cocktail", "Festival", "Formal", "Casual"].map((c) => <option key={c}>{c}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Pincode">
+                    <input
+                      value={pincode}
+                      onChange={(e) => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      placeholder="e.g. 560038"
+                      className="form-input"
+                      required
+                    />
+                  </Field>
+                  <Field label="City">
+                    <select value={city} onChange={(e) => setCity(e.target.value)} className="form-input">
+                      {CITIES.map((c) => <option key={c}>{c}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Size">
+                    <div className="flex gap-1.5 flex-wrap">
+                      {SIZES.map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => setSize(s)}
+                          className={`text-xs px-3 py-2 border ${size === s ? "bg-ink text-cream border-ink" : "border-border text-ink hover:border-ink"}`}
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  </Field>
+                  <Field label="Description">
+                    <textarea
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value.slice(0, 500))}
+                      placeholder="Fabric, fit, includes, and care notes"
+                      className="form-input min-h-24"
+                    />
+                  </Field>
+                  <Field label="Retail price (₹)">
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      value={retail}
+                      onChange={(e) => setRetail(e.target.value === "" ? "" : Number(e.target.value))}
+                      placeholder="32000"
+                      className="form-input"
+                    />
+                  </Field>
+                </div>
               </div>
-              <button
-                type="submit"
-                disabled={!canSubmit || submitting}
-                className="inline-flex items-center justify-center gap-2 bg-ink text-cream px-7 py-3.5 text-sm font-medium hover:bg-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+
+              {/* Pricing */}
+              <div>
+                <Label num="03" title="Pricing" hint="Set your daily rate and deposit" />
+                {suggestedPrice > 0 && (
+                  <div className="mt-3 flex items-start gap-2 text-xs text-primary bg-primary/5 border border-primary/20 px-3 py-2">
+                    <Sparkles className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                    <span>
+                      Based on similar pieces, we suggest <strong>₹{suggestedPrice}/day</strong> with a{" "}
+                      <strong>₹{suggestedDeposit}</strong> refundable deposit.{" "}
+                      <button
+                        type="button"
+                        onClick={() => { setPricePerDay(suggestedPrice); setDeposit(suggestedDeposit); }}
+                        className="underline ml-1"
+                      >
+                        Apply
+                      </button>
+                    </span>
+                  </div>
+                )}
+                <div className="mt-4 grid sm:grid-cols-2 gap-4">
+                  <Field label="Price per day (₹)">
+                    <input
+                      type="number"
+                      min={0}
+                      value={pricePerDay}
+                      onChange={(e) => setPricePerDay(e.target.value === "" ? "" : Number(e.target.value))}
+                      placeholder="1500"
+                      className="form-input"
+                      required
+                    />
+                  </Field>
+                  <Field label="Refundable deposit (₹)">
+                    <input
+                      type="number"
+                      min={0}
+                      value={deposit}
+                      onChange={(e) => setDeposit(e.target.value === "" ? "" : Number(e.target.value))}
+                      placeholder="5000"
+                      className="form-input"
+                      required
+                    />
+                  </Field>
+                </div>
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  WearShare keeps a 15% commission. You see the net payout before publishing.
+                </p>
+              </div>
+
+              {/* Availability calendar */}
+              <div>
+                <Label num="04" title="Availability" hint="Tap dates you're NOT available" />
+                <div className="mt-4 flex flex-col md:flex-row gap-6">
+                  <div className="border border-border bg-background">
+                    <Calendar
+                      mode="multiple"
+                      selected={unavailable}
+                      onSelect={setUnavailable}
+                      disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0))}
+                      className="p-3 pointer-events-auto"
+                    />
+                  </div>
+                  <div className="text-sm flex-1">
+                    <p className="eyebrow">Blocked dates</p>
+                    {unavailable && unavailable.length > 0 ? (
+                      <ul className="mt-3 flex flex-wrap gap-1.5">
+                        {unavailable
+                          .slice()
+                          .sort((a, b) => a.getTime() - b.getTime())
+                          .map((d) => (
+                            <li key={d.toISOString()} className="text-xs bg-ink text-cream px-2 py-1">
+                              {d.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                            </li>
+                          ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-3 text-muted-foreground text-xs">Open every day. Renters can request any date.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Submit */}
+              <div className="hairline pt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    By listing, you agree to WearShare's{" "}
+                    <Link href="/how-it-works" className="underline">trust & safety policy</Link>.
+                  </p>
+                  {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+                </div>
+                <button
+                  type="submit"
+                  disabled={!canSubmit || submitting}
+                  className="inline-flex items-center justify-center gap-2 bg-ink text-cream px-7 py-3.5 text-sm font-medium hover:bg-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {submitting ? "Publishing..." : "Publish listing"} <ArrowUpRight className="h-4 w-4" />
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      {submitted && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-background p-8 md:p-10 max-w-md w-full rounded-2xl shadow-2xl text-center relative animate-in fade-in zoom-in duration-300">
+            <div className="h-16 w-16 rounded-full bg-green-500 text-white mx-auto flex items-center justify-center mb-6 shadow-lg shadow-green-500/30">
+              <Check className="h-8 w-8" />
+            </div>
+            <h2 className="font-display text-4xl text-ink">Listing Successful!</h2>
+            <p className="mt-3 text-muted-foreground text-sm">
+              Your piece has been successfully listed. Our team reviews new listings within 4 hours. You'll get a WhatsApp ping the moment it goes live.
+            </p>
+            <div className="mt-8 flex flex-col gap-3">
+              <Link
+                href="/dashboard/lister"
+                className="w-full inline-flex items-center justify-center bg-primary text-white hover:bg-primary/90 rounded-xl py-3.5 text-sm font-medium transition"
               >
-                {submitting ? "Publishing..." : "Publish listing"} <ArrowUpRight className="h-4 w-4" />
+                View Dashboard
+              </Link>
+              <button
+                onClick={() => {
+                  setSubmitted(false);
+                  setPhotos([]);
+                  setPhotoFiles([]);
+                  setTitle("");
+                  setDescription("");
+                  setRetail("");
+                  setPricePerDay("");
+                  setDeposit("");
+                  setCity("Bengaluru");
+                  setUnavailable([]);
+                  setError("");
+                }}
+                className="w-full bg-secondary text-ink hover:bg-secondary/80 rounded-xl py-3.5 text-sm font-medium transition"
+              >
+                List another piece
               </button>
             </div>
-          </form>
-        </div>
-      </div>
-    </section>
-
-    {submitted && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-        <div className="bg-background p-8 md:p-10 max-w-md w-full rounded-2xl shadow-2xl text-center relative animate-in fade-in zoom-in duration-300">
-          <div className="h-16 w-16 rounded-full bg-green-500 text-white mx-auto flex items-center justify-center mb-6 shadow-lg shadow-green-500/30">
-            <Check className="h-8 w-8" />
-          </div>
-          <h2 className="font-display text-4xl text-ink">Listing Successful!</h2>
-          <p className="mt-3 text-muted-foreground text-sm">
-            Your piece has been successfully listed. Our team reviews new listings within 4 hours. You'll get a WhatsApp ping the moment it goes live.
-          </p>
-          <div className="mt-8 flex flex-col gap-3">
-            <Link
-              href="/dashboard/lister"
-              className="w-full inline-flex items-center justify-center bg-primary text-white hover:bg-primary/90 rounded-xl py-3.5 text-sm font-medium transition"
-            >
-              View Dashboard
-            </Link>
-            <button
-              onClick={() => {
-                setSubmitted(false);
-                setPhotos([]);
-                setPhotoFiles([]);
-                setTitle("");
-                setDescription("");
-                setRetail("");
-                setPricePerDay("");
-                setDeposit("");
-                setCity("Bengaluru");
-                setUnavailable([]);
-                setError("");
-              }}
-              className="w-full bg-secondary text-ink hover:bg-secondary/80 rounded-xl py-3.5 text-sm font-medium transition"
-            >
-              List another piece
-            </button>
           </div>
         </div>
-      </div>
-    )}
+      )}
     </>
   );
 }
