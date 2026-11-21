@@ -17,7 +17,7 @@
 **Wear it once. Share it forward.**  
 Premium ethnic and western wear for weddings, sangeets, college formals, and parties — rented directly from verified wardrobes within your neighbourhood pincode.
 
-[🌐 Live Production Demo](https://wearshare.qzz.io) • [📖 Architecture & Flows](#-system-architecture) • [⚡ Quick Start](#-quick-start) • [🚀 Improvement Roadmap](#-future-roadmap--enhancements)
+[🌐 Live Production Demo](https://wearshare.qzz.io) • [📖 Architecture & Flows](#-system-architecture) • [📚 Technical Deep-Dive](docs/TECH_ROADMAP_AND_ARCHITECTURE.md) • [📋 Project Summary](docs/PROJECT_SUMMARY.md) • [⚡ Quick Start](#-quick-start)
 
 ---
 
@@ -265,6 +265,8 @@ Key strategic and technical avenues to take WearShare from MVP to production-sca
 
 ---
 
-## 📄 License
+## 👤 Author
 
-This project is licensed under the [MIT License](LICENSE).
+**Kuchipudi Yokshith Sai Ram Chowdary**  
+GitHub: [@yokshith09](https://github.com/yokshith09)  
+Email: yokshithkuchipudi09@gmail.com
