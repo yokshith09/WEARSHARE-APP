@@ -21,7 +21,12 @@ export default function ListItem() {
   const { status } = useSession();
   const router = useRouter();
 
-  if (status === "loading") return <div className="py-32 text-center text-muted-foreground">Loading...</div>;
+  if (status === "loading") return (
+    <div className="py-32 text-center">
+      <div className="mx-auto h-12 w-12 rounded-full border-4 border-muted border-t-primary animate-spin" />
+      <p className="mt-4 text-sm text-muted-foreground">Loading...</p>
+    </div>
+  );
   if (status === "unauthenticated") {
     router.push("/login?callbackUrl=/list-item");
     return null;

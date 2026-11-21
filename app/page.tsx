@@ -7,6 +7,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { WaitlistForm } from "@/components/waitlist-form";
 import { Card3D } from "@/components/ui/card-3d";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
+import { TextReveal } from "@/components/ui/text-reveal";
 
 export const revalidate = 60;
 
@@ -133,11 +134,14 @@ export default async function Index() {
             <ScrollReveal direction="up" duration={0.65}>
               <p className="eyebrow">A neighbourhood wardrobe / Est. Bengaluru</p>
               <h1 className="mt-5 font-display text-[clamp(2.75rem,7vw,6rem)] leading-[0.95] text-ink">
-                Wear it once.
-                <br />
-                <span className="italic text-primary">Share</span> it forward.
+                <TextReveal
+                  text="Wear it once. Share it forward."
+                  highlight={{ words: ["Share"], className: "italic text-primary" }}
+                  staggerMs={100}
+                  duration={0.55}
+                />
               </h1>
-              <p className="mt-7 max-w-xl text-base leading-relaxed text-muted-foreground md:text-lg">
+              <p className="mt-7 max-w-xl text-base leading-relaxed text-muted-foreground md:text-lg animate-blur-in" style={{ animationDelay: "0.6s" }}>
                 Premium outfits for weddings, parties and college nights, rented from verified listers within
                 your pincode. No fast fashion. No storage. No regrets.
               </p>
@@ -183,7 +187,7 @@ export default async function Index() {
 
           <div className="relative order-1 md:order-2 md:col-span-5">
             <ScrollReveal direction="left" delayMs={100} duration={0.85}>
-              <Card3D className="shadow-2xl">
+              <Card3D className="shadow-2xl animate-float">
                 <div className="relative aspect-[3/4] overflow-hidden rounded-xl">
                   <Image
                     src="/assets/hero-lehenga.jpg"
@@ -195,7 +199,7 @@ export default async function Index() {
                   />
                 </div>
               </Card3D>
-              <div className="panel absolute -bottom-6 -left-4 max-w-[240px] p-5 md:-left-10 z-30 shadow-lg">
+              <div className="panel absolute -bottom-6 -left-4 max-w-[240px] p-5 md:-left-10 z-30 shadow-lg animate-scale-up" style={{ animationDelay: "0.8s" }}>
                 <p className="eyebrow">This look</p>
                 <p className="mt-1 font-display text-base leading-snug text-ink">Emerald Silk Lehenga by Deepa M.</p>
                 <p className="mt-2 text-xs text-muted-foreground">Indiranagar / 2.4 km</p>

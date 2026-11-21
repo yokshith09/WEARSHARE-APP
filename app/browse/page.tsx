@@ -10,6 +10,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { useSearchParams } from "next/navigation";
 import { trackEvent } from "@/lib/analytics";
+import { SkeletonGrid } from "@/components/ui/skeleton-card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
 
 type CollectionType = "All" | "Women" | "Men" | "Accessories";
 
@@ -37,7 +40,7 @@ const distances = [
 
 export default function Browse() {
   return (
-    <Suspense fallback={<div className="container-edit py-20 text-sm text-muted-foreground">Loading outfits...</div>}>
+    <Suspense fallback={<div className="container-edit py-20"><SkeletonGrid count={8} /></div>}>
       <BrowseContent />
     </Suspense>
   );
@@ -82,6 +85,7 @@ function BrowseContent() {
   const [trustedOnly, setTrustedOnly] = useState(false);
   const [apiListings, setApiListings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [autoExpanded, setAutoExpanded] = useState(false);
   const railRef = useRef<HTMLDivElement>(null);
 
@@ -98,6 +102,7 @@ function BrowseContent() {
 
   useEffect(() => {
     setLoading(true);
+    setFetchError(false);
     const params = new URLSearchParams();
     if (pincode && pincode.length === 6) {
       params.set('originPincode', pincode);
@@ -114,7 +119,7 @@ function BrowseContent() {
         setApiListings(Array.isArray(data) ? data : []);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch(() => { setFetchError(true); setLoading(false); });
   }, [pincode, maxKm]);
 
   const activeCategoryList = useMemo(() => {
@@ -480,18 +485,20 @@ function BrowseContent() {
           </div>
         )}
         {loading ? (
-          <div className="text-center py-20 text-muted-foreground">Loading outfits...</div>
+          <SkeletonGrid count={8} />
+        ) : fetchError ? (
+          <ErrorState
+            title="Couldn't load outfits"
+            description="Something went wrong while fetching listings. Check your connection and try again."
+            onRetry={() => { setFetchError(false); setLoading(true); }}
+          />
         ) : filtered.length === 0 ? (
-          <div className="text-center py-20 max-w-md mx-auto">
-            <Sparkles className="mx-auto h-8 w-8 text-primary mb-3" />
-            <p className="font-display text-2xl text-ink">No outfits match your filters</p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Try switching sections or resetting your distance and occasion filters.
-            </p>
-            <button onClick={clearAll} className="mt-5 btn-primary text-xs px-5 py-2.5">
-              Reset all filters
-            </button>
-          </div>
+          <EmptyState
+            title="No outfits match your filters"
+            description="Try switching sections or resetting your distance and occasion filters."
+            actionLabel="Reset all filters"
+            onAction={clearAll}
+          />
         ) : (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-5 gap-y-12">
             {filtered.map((l) => (
