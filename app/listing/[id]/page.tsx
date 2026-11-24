@@ -12,7 +12,6 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useParams, useRouter } from "next/navigation";
 import { trackEvent } from "@/lib/analytics";
-import { Card3D } from "@/components/ui/card-3d";
 import { SmartFitRecommender } from "@/components/smart-fit-recommender";
 import { FabricZoomLoupe } from "@/components/fabric-zoom-loupe";
 import { SocialProofBadge } from "@/components/social-proof-badge";
@@ -143,9 +142,7 @@ export default function ListingDetail() {
       <section className="container-edit pt-6 pb-16 grid lg:grid-cols-[minmax(0,0.95fr)_minmax(360px,0.65fr)] gap-8 lg:gap-14">
         {/* Gallery */}
         <div className="min-w-0">
-          <Card3D className="shadow-2xl">
-            <FabricZoomLoupe src={activeImage} alt={title} />
-          </Card3D>
+          <FabricZoomLoupe src={activeImage} alt={title} />
           {galleryImages.length > 1 && (
             <div className="grid grid-cols-4 gap-3 mt-4">
               {galleryImages.slice(0, 4).map((src, i) => (
