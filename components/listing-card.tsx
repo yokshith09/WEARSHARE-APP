@@ -6,6 +6,7 @@ import type { Listing } from "@/lib/listings";
 import { inr } from "@/lib/listings";
 
 import { Card3D } from "@/components/ui/card-3d";
+import { SocialProofBadge } from "@/components/social-proof-badge";
 
 export function ListingCard({ listing, priority = false }: { listing: any; priority?: boolean }) {
   const isVerified = listing.ownerId?.isVerified || listing.verified;
@@ -50,6 +51,7 @@ export function ListingCard({ listing, priority = false }: { listing: any; prior
                 <BadgeCheck className="h-3 w-3" /> Trusted Lender
               </span>
             )}
+            <SocialProofBadge listingId={listing._id || listing.id || "ws"} variant="card" />
           </div>
           
           {/* Bottom Hover Actions */}

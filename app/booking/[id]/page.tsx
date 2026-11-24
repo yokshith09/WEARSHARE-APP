@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ShieldCheck, Zap, Check, Lock } from "lucide-react";
+import { ArrowLeft, ShieldCheck, Zap, Check, Lock, Download, Calendar as CalendarIcon, MessageCircle, FileText, Printer } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { inr } from "@/lib/listings";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
@@ -88,7 +88,7 @@ export default function BookingConfirm() {
 
           const confirmData = await confirmRes.json();
           if (confirmData.success) {
-            router.push("/dashboard?checkout=success");
+            router.push(`/booking/${id}?confirmed=true&orderId=${confirmData.bookingId || orderData.orderId}`);
           } else {
             alert("Payment verification failed. Please contact support.");
           }
@@ -139,6 +139,122 @@ export default function BookingConfirm() {
       <div className="container-edit py-32 text-center">
         <p className="font-display text-3xl">Outfit not found</p>
         <Link href="/browse" className="mt-6 inline-block text-primary underline">Back to browse</Link>
+      </div>
+    );
+  }
+
+  const isConfirmed = searchParams.get("confirmed") === "true";
+  const confirmedOrderId = searchParams.get("orderId") || `WS-ORD-${id.slice(0, 6).toUpperCase()}`;
+
+  const downloadCalendar = () => {
+    const title = `WearShare: Pickup ${listing?.name || listing?.title || "Outfit"}`;
+    const desc = `Rental handover with ${listing?.lister || "Lister"}. Pickup: ${format(from, "d MMM yyyy")}, Return: ${format(to, "d MMM yyyy")}`;
+    const startStr = from.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+    const endStr = to.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+    const icsContent = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//WearShare//Rental//EN\nBEGIN:VEVENT\nSUMMARY:${title}\nDESCRIPTION:${desc}\nDTSTART:${startStr}\nDTEND:${endStr}\nLOCATION:${listing?.area || "Bengaluru"}\nSTATUS:CONFIRMED\nEND:VEVENT\nEND:VCALENDAR`;
+    const blob = new Blob([icsContent], { type: "text/calendar;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `wearshare-rental-${id.slice(0, 8)}.ics`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  if (isConfirmed) {
+    return (
+      <div className="bg-background min-h-[80vh] py-12">
+        <div className="container-edit max-w-3xl">
+          <div className="rounded-2xl border border-primary/20 bg-card p-8 md:p-12 shadow-xl print:border-none print:shadow-none">
+            {/* Header / Verified Badge */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-6">
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-white shadow-md">
+                  <Check className="h-6 w-6" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-primary">Booking Confirmed</span>
+                  <h1 className="font-display text-2xl md:text-3xl text-ink">Rental Agreement & Escrow Secured</h1>
+                </div>
+              </div>
+              <div className="text-left sm:text-right">
+                <span className="text-[10px] uppercase font-bold text-muted-foreground block">Booking Reference</span>
+                <span className="font-mono text-xs font-bold text-ink">{confirmedOrderId}</span>
+              </div>
+            </div>
+
+            {/* Garment details */}
+            <div className="mt-8 flex flex-col sm:flex-row gap-5 items-center rounded-xl bg-secondary/30 p-5 border border-border">
+              <img
+                src={listing.imageUrl || listing.imageData || listing.image}
+                alt={listing.name || listing.title}
+                className="h-28 w-24 rounded-lg object-cover bg-muted shrink-0 shadow-sm"
+              />
+              <div className="flex-1 min-w-0">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-primary">{listing.category || "Designer"}</span>
+                <h3 className="font-display text-xl text-ink leading-tight mt-1">{listing.name || listing.title}</h3>
+                <p className="text-xs text-muted-foreground mt-1">Lister: {listing.lister || listing.ownerName} · {listing.area || "Bengaluru"}</p>
+                <div className="mt-3 flex flex-wrap gap-4 text-xs font-medium text-ink">
+                  <span>📅 Pickup: <strong>{format(from, "d MMM yyyy")}</strong></span>
+                  <span>🔄 Return: <strong>{format(to, "d MMM yyyy")}</strong></span>
+                  <span>⏱️ Duration: <strong>{days} days</strong></span>
+                </div>
+              </div>
+            </div>
+
+            {/* Financial & Escrow Certificate */}
+            <div className="mt-6 rounded-xl border border-border bg-white p-5 space-y-3 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Rental Fee ({days} days)</span>
+                <span className="text-ink font-medium">{inr(subtotal)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Damage Protection Cover (5%)</span>
+                <span className="text-ink font-medium">{inr(protectionFee)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Refundable Security Deposit (in Escrow)</span>
+                <span className="text-emerald-700 font-bold">{inr(depositAmt)}</span>
+              </div>
+              <div className="pt-3 border-t border-border flex items-center justify-between text-base font-bold text-ink">
+                <span>Total Paid</span>
+                <span className="font-display text-xl">{inr(total)}</span>
+              </div>
+            </div>
+
+            {/* Escrow Guarantee Seal */}
+            <div className="mt-6 rounded-xl bg-primary/5 border border-primary/20 p-4 flex items-start gap-3 text-xs text-muted-foreground">
+              <ShieldCheck className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+              <div>
+                <strong className="text-ink block">WearShare 24-Hour Deposit Guarantee</strong>
+                Your deposit of {inr(depositAmt)} is locked in escrow. It will automatically release to your account 24 hours after the return inspection is confirmed.
+              </div>
+            </div>
+
+            {/* Actions Bar */}
+            <div className="mt-8 flex flex-wrap gap-3 pt-6 border-t border-border print:hidden">
+              <button
+                onClick={() => window.print()}
+                className="btn-outline flex-1 sm:flex-none text-xs inline-flex items-center justify-center gap-1.5 py-3 px-4"
+              >
+                <Printer className="h-4 w-4" /> Print / Save PDF
+              </button>
+              <button
+                onClick={downloadCalendar}
+                className="btn-outline flex-1 sm:flex-none text-xs inline-flex items-center justify-center gap-1.5 py-3 px-4"
+              >
+                <CalendarIcon className="h-4 w-4" /> Add to Calendar (.ics)
+              </button>
+              <Link
+                href={`/trips/${id}`}
+                className="btn-primary flex-1 text-xs inline-flex items-center justify-center gap-1.5 py-3 px-5 shadow-md"
+              >
+                <MessageCircle className="h-4 w-4" /> Open Trip Chat & Handover
+              </Link>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

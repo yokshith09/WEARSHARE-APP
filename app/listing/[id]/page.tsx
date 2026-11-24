@@ -14,6 +14,8 @@ import { useParams, useRouter } from "next/navigation";
 import { trackEvent } from "@/lib/analytics";
 import { Card3D } from "@/components/ui/card-3d";
 import { SmartFitRecommender } from "@/components/smart-fit-recommender";
+import { FabricZoomLoupe } from "@/components/fabric-zoom-loupe";
+import { SocialProofBadge } from "@/components/social-proof-badge";
 
 export default function ListingDetail() {
   const params = useParams();
@@ -142,9 +144,7 @@ export default function ListingDetail() {
         {/* Gallery */}
         <div className="min-w-0">
           <Card3D className="shadow-2xl">
-            <div className="aspect-[4/5] lg:aspect-[5/6] max-h-[720px] overflow-hidden bg-muted rounded-xl shadow-xl border border-border">
-              <img src={activeImage} alt={title} className="h-full w-full object-cover object-top" />
-            </div>
+            <FabricZoomLoupe src={activeImage} alt={title} />
           </Card3D>
           {galleryImages.length > 1 && (
             <div className="grid grid-cols-4 gap-3 mt-4">
@@ -181,6 +181,12 @@ export default function ListingDetail() {
               </span>
             )}
           </div>
+
+          <SocialProofBadge
+            listingId={listing._id || listing.id}
+            area={area}
+            reviewsCount={listing.reviews}
+          />
 
           <div className="mt-8 flex items-end gap-4">
             <p className="font-display text-4xl text-ink">{price ? `₹${price.toLocaleString("en-IN")}` : '₹0'}<span className="text-base text-muted-foreground font-sans">/day</span></p>
