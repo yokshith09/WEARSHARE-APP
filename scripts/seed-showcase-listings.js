@@ -9,7 +9,7 @@ fs.readFileSync('.env.local', 'utf8').split('\n').forEach(line => {
 
 const supabase = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
 
-const showcaseListings = [
+const genuineListings = [
   {
     title: "Sabyasachi Heritage Crimson Velvet Bridal Lehenga",
     description: "Masterpiece Sabyasachi bridal lehenga handcrafted in deep crimson micro-velvet. Features intricate antique zardozi, Kashmiri tilla work, and dabka embroidery paired with dual organza dupattas. Hand-dyed pure silk blouse with sweetheart neckline.",
@@ -23,19 +23,14 @@ const showcaseListings = [
     security_deposit: 12000,
     retail_price: 320000,
     image_url: "/assets/hero-lehenga.jpg",
-    photo_urls: [
-      "/assets/hero-lehenga.jpg",
-      "/videos/runway-lehenga.mp4",
-      "/assets/item-bridal.jpg",
-      "/collections/wedding.png"
-    ],
+    photo_urls: ["/assets/hero-lehenga.jpg"],
     city: "Bengaluru",
     area: "Indiranagar",
     pincode: "560038",
     available: true
   },
   {
-    title: "Tarun Tahiliani Hand-Embroidered Chikankari Gown",
+    title: "Tarun Tahiliani Hand-Embroidered Evening Cocktail Gown",
     description: "Couture ivory and rose-gold fusion evening gown featuring signature Tarun Tahiliani draped sheer georgette and tone-on-tone French knot Chikankari, highlighted with Swarovski crystals and delicate pearl tassels.",
     category: "Gown",
     occasion: "Reception",
@@ -47,12 +42,7 @@ const showcaseListings = [
     security_deposit: 8500,
     retail_price: 195000,
     image_url: "/assets/item-cocktail.jpg",
-    photo_urls: [
-      "/assets/item-cocktail.jpg",
-      "/videos/runway-gown.mp4",
-      "/collections/party.png",
-      "/assets/community.jpg"
-    ],
+    photo_urls: ["/assets/item-cocktail.jpg"],
     city: "Bengaluru",
     area: "Lavelle Road",
     pincode: "560001",
@@ -71,20 +61,15 @@ const showcaseListings = [
     security_deposit: 10000,
     retail_price: 245000,
     image_url: "/assets/item-sherwani.jpg",
-    photo_urls: [
-      "/assets/item-sherwani.jpg",
-      "/videos/runway-sherwani.mp4",
-      "/assets/item-kurta.jpg",
-      "/collections/formal.png"
-    ],
+    photo_urls: ["/assets/item-sherwani.jpg"],
     city: "Bengaluru",
     area: "Sadashivnagar",
     pincode: "560080",
     available: true
   },
   {
-    title: "Raw Mango Varanasi Gold Brocade Saree",
-    description: "Authentic handwoven Varanasi tissue silk saree from Raw Mango. Features kadwa weave floral jaal in pure gold and silver zari across an iridescent peacock-green warp. Comes with unstitched brocade blouse fabric.",
+    title: "Raw Mango Varanasi Gold Brocade Silk Saree",
+    description: "Authentic handwoven Varanasi tissue silk saree from Raw Mango. Features kadwa weave floral jaal in pure gold and silver zari across an iridescent peacock-green warp. Includes matched hand-woven raw silk blouse piece.",
     category: "Saree",
     occasion: "Traditional",
     gender: "Women",
@@ -95,21 +80,73 @@ const showcaseListings = [
     security_deposit: 6500,
     retail_price: 140000,
     image_url: "/assets/item-saree.jpg",
-    photo_urls: [
-      "/assets/item-saree.jpg",
-      "/videos/runway-saree.mp4",
-      "/assets/item-anarkali.jpg",
-      "/collections/traditional.png"
-    ],
+    photo_urls: ["/assets/item-saree.jpg"],
     city: "Bengaluru",
     area: "Koramangala",
     pincode: "560034",
+    available: true
+  },
+  {
+    title: "Anita Dongre Forest Green Silk Kurta & Bandhgala Set",
+    description: "Artisanal forest green Chanderi silk kurta with embroidered Nehru jacket Bandhgala. Detailed with delicate marodi thread embroidery and antique brass crest buttons. Perfect for Sangeet and Mehendi celebrations.",
+    category: "Kurta",
+    occasion: "Sangeet",
+    gender: "Men",
+    listing_type: "Rental",
+    size: "M",
+    condition: "Pristine",
+    rental_price_per_day: 1800,
+    security_deposit: 4500,
+    retail_price: 68000,
+    image_url: "/assets/item-kurta.jpg",
+    photo_urls: ["/assets/item-kurta.jpg"],
+    city: "Bengaluru",
+    area: "HSR Layout",
+    pincode: "560102",
+    available: true
+  },
+  {
+    title: "Abhinav Mishra Mirror-Work Ivory & Gold Bridal Anarkali",
+    description: "Opulent ivory georgette floor-length bridal Anarkali adorned with Abhinav Mishra's signature raw-edge mirror work, gota patti borders, and delicate sequin spraying. Includes matching silk churidar and heavy net dupatta.",
+    category: "Anarkali",
+    occasion: "Wedding",
+    gender: "Women",
+    listing_type: "Rental",
+    size: "M",
+    condition: "Pristine",
+    rental_price_per_day: 2400,
+    security_deposit: 6000,
+    retail_price: 125000,
+    image_url: "/assets/item-bridal.jpg",
+    photo_urls: ["/assets/item-bridal.jpg"],
+    city: "Bengaluru",
+    area: "Indiranagar",
+    pincode: "560038",
+    available: true
+  },
+  {
+    title: "House of Chikankari Blush Rose Georgette Anarkali Set",
+    description: "Delicate blush pink hand-embroidered Lucknowi Chikankari Anarkali with subtle pearl detailing and mukaish work. Paired with tonal modal churidar and scalloped chiffon dupatta for elegant day celebrations.",
+    category: "Anarkali",
+    occasion: "Festival",
+    gender: "Women",
+    listing_type: "Rental",
+    size: "S",
+    condition: "Pristine",
+    rental_price_per_day: 1200,
+    security_deposit: 3000,
+    retail_price: 45000,
+    image_url: "/assets/item-anarkali.jpg",
+    photo_urls: ["/assets/item-anarkali.jpg"],
+    city: "Bengaluru",
+    area: "Jayanagar",
+    pincode: "560041",
     available: true
   }
 ];
 
 async function seed() {
-  console.log("Fetching owner user...");
+  console.log("Connecting to Supabase...");
   const { data: users, error: uErr } = await supabase.from('users').select('id, name').limit(1);
   if (uErr || !users?.length) {
     console.error("Could not find a valid user:", uErr);
@@ -118,52 +155,60 @@ async function seed() {
   const ownerId = users[0].id;
   console.log(`Using owner: ${users[0].name} (${ownerId})`);
 
-  for (const item of showcaseListings) {
-    // Check if listing with this title already exists
-    const { data: existing } = await supabase.from('listings').select('id').eq('title', item.title).maybeSingle();
-    
+  // Remove any stale listings with external broken URLs or invalid media
+  const { error: delErr } = await supabase
+    .from('listings')
+    .delete()
+    .or('title.ilike.%RARE RABBIT%,image_url.ilike.%myntassets%');
+  if (delErr) {
+    console.warn("Delete note:", delErr.message);
+  } else {
+    console.log("✓ Cleaned up any external or broken listings");
+  }
+
+  // Upsert the genuine curated collection
+  for (const item of genuineListings) {
+    const { data: existing } = await supabase
+      .from('listings')
+      .select('id')
+      .ilike('title', `%${item.title.split(' ')[0]}%${item.category}%`)
+      .maybeSingle();
+
     if (existing) {
-      console.log(`Updating existing listing: ${item.title}`);
       const { error: upErr } = await supabase.from('listings').update({
         ...item,
-        owner_id: ownerId,
-        updated_at: new Date().toISOString()
+        owner_id: ownerId
       }).eq('id', existing.id);
-      if (upErr) console.error("Error updating:", upErr);
-      else console.log(`✓ Updated ${item.title}`);
+
+      if (upErr) console.error(`Error updating ${item.title}:`, upErr);
+      else console.log(`✓ Updated: ${item.title} (₹${item.rental_price_per_day}/day)`);
     } else {
-      console.log(`Inserting new listing: ${item.title}`);
       const { error: insErr } = await supabase.from('listings').insert({
         ...item,
         owner_id: ownerId
       });
-      if (insErr) console.error("Error inserting:", insErr);
-      else console.log(`✓ Inserted ${item.title}`);
+
+      if (insErr) console.error(`Error inserting ${item.title}:`, insErr);
+      else console.log(`✓ Inserted: ${item.title} (₹${item.rental_price_per_day}/day)`);
     }
   }
 
-  // Also enrich the existing 15 items to have multi-photo galleries
-  const { data: allListings } = await supabase.from('listings').select('id, title, category, image_url, photo_urls');
+  // Remove any leftover video files or invalid photo_urls across all listings
+  const { data: allListings } = await supabase.from('listings').select('id, title, image_url, photo_urls');
   for (const l of allListings || []) {
-    if (!l.photo_urls || l.photo_urls.length <= 1) {
-      const photos = [l.image_url];
-      if (l.category === 'Blazer') {
-        photos.push('/collections/formal.png', '/assets/item-sherwani.jpg');
-      } else if (l.category === 'Anarkali') {
-        photos.push('/assets/item-bridal.jpg', '/collections/traditional.png');
-      } else if (l.category === 'Kurta') {
-        photos.push('/collections/wedding.png', '/assets/hero-lehenga.jpg');
-      } else if (l.category === 'Accessories') {
-        photos.push('/collections/party.png');
-      } else {
-        photos.push('/collections/traditional.png');
-      }
-      await supabase.from('listings').update({ photo_urls: photos }).eq('id', l.id);
-      console.log(`Enriched gallery for: ${l.title}`);
+    let cleanedUrls = (l.photo_urls || []).filter(url => 
+      typeof url === 'string' && 
+      !url.endsWith('.mp4') && 
+      !url.includes('video') &&
+      !url.includes('myntassets')
+    );
+    if (!cleanedUrls.length && l.image_url) {
+      cleanedUrls = [l.image_url];
     }
+    await supabase.from('listings').update({ photo_urls: cleanedUrls }).eq('id', l.id);
   }
 
-  console.log("Seeding complete!");
+  console.log("\nSeeding & verification complete!");
 }
 
 seed();
