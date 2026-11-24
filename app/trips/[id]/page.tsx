@@ -55,6 +55,8 @@ export default function TripPage() {
   const [pickupPhotos, setPickupPhotos] = useState<string[]>([]);
   const [returnPhotos, setReturnPhotos] = useState<string[]>([]);
   const [depositReleased, setDepositReleased] = useState(false);
+  const [deliveryMode, setDeliveryMode] = useState<"self" | "courier">("self");
+  const [courierDispatched, setCourierDispatched] = useState(false);
 
   const [messages, setMessages] = useState<Msg[]>([
     { id: "m1", from: "lister", kind: "text", time: "10:24 AM", text: `Hi! Booking confirmed. Pickup is at my place in ${listing?.area || ""} - anytime between 6-9pm Friday works.` },
@@ -390,12 +392,102 @@ export default function TripPage() {
                   {depositReleased ? "Released" : "Release deposit"}
                 </button>
               </div>
+
+              <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
+                <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+                  <ShieldCheck className="h-3.5 w-3.5 text-primary" /> 24h Escrow Dispute Protection
+                </span>
+                <Link
+                  href={`/claims/${listing._id || listing.id}`}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-rust hover:underline"
+                >
+                  <AlertTriangle className="h-3.5 w-3.5" /> Report Damage / Open Dispute
+                </Link>
+              </div>
             </TimelineStep>
           </div>
         </div>
 
         <div className="mt-10 grid md:grid-cols-12 gap-8">
           <div className="md:col-span-5 space-y-6">
+            {/* Handover & Delivery Options */}
+            <div className="border border-border bg-card p-5">
+              <div className="flex items-center justify-between border-b border-border pb-3">
+                <p className="text-sm font-semibold text-ink flex items-center gap-2">
+                  <Truck className="h-4 w-4 text-primary" /> Handover Logistics
+                </p>
+                <span className="text-[10px] uppercase font-bold text-muted-foreground">Bengaluru Metro</span>
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setDeliveryMode("self")}
+                  className={`rounded-lg border p-3 text-left transition ${
+                    deliveryMode === "self" ? "border-primary bg-primary/10 text-ink" : "border-border text-muted-foreground hover:border-ink"
+                  }`}
+                >
+                  <p className="font-semibold text-xs text-ink">Walk-in Pickup</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Free · Meet at location</p>
+                </button>
+                <button
+                  onClick={() => setDeliveryMode("courier")}
+                  className={`rounded-lg border p-3 text-left transition ${
+                    deliveryMode === "courier" ? "border-primary bg-primary/10 text-ink" : "border-border text-muted-foreground hover:border-ink"
+                  }`}
+                >
+                  <p className="font-semibold text-xs text-ink">Dunzo / Porter</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">₹120 · Instant dispatch</p>
+                </button>
+              </div>
+
+              {deliveryMode === "courier" && (
+                <div className="mt-4 rounded-lg bg-secondary/40 p-3.5 text-xs space-y-2 border border-border">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-ink">Courier Status</span>
+                    <span className="rounded-full bg-emerald-600/10 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                      {courierDispatched ? "Rider Dispatched" : "Ready to Dispatch"}
+                    </span>
+                  </div>
+                  {courierDispatched ? (
+                    <div className="space-y-1 text-muted-foreground text-[11px]">
+                      <p className="text-ink font-semibold">Rider: Ramesh Kumar · Hero Splendor</p>
+                      <p>Vehicle No: KA 03 HX 4912 · ETA: 18 mins</p>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={async () => {
+                        setCourierDispatched(true);
+                        const msgText = `📦 Hyperlocal Courier Dispatched: Ramesh Kumar (KA 03 HX 4912) is en route to ${listing.area || "Indiranagar"} (ETA: 18 mins).`;
+                        setMessages((m) => [
+                          ...m,
+                          {
+                            id: `m-${Date.now()}`,
+                            from: "me",
+                            kind: "text",
+                            time: "Just now",
+                            text: msgText,
+                          },
+                        ]);
+                        try {
+                          await fetch(`/api/trips/${id}/messages`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              content: msgText,
+                              kind: "system",
+                            }),
+                          });
+                        } catch {}
+                      }}
+                      className="btn-primary w-full text-xs py-2 mt-2"
+                    >
+                      Dispatch Dunzo Delivery (₹120)
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
             <div className="border border-border">
               <div className="px-5 py-4 bg-secondary/40 flex items-center gap-2">
                 <MapPin className="h-4 w-4 text-primary" />

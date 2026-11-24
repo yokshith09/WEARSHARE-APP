@@ -15,6 +15,8 @@ import {
   Tag,
   TrendingUp,
   Wallet,
+  ShieldCheck,
+  AlertTriangle,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 
@@ -100,6 +102,38 @@ export default function ListerDashboard() {
         <Metric title="Active rentals" value={String(activeRentals.length)} icon={CalendarClock} />
         <Metric title="Pending payout" value={inr(pendingPayout)} icon={Wallet} />
         <Metric title="Lifetime earnings" value={inr(totalEarnings)} icon={TrendingUp} />
+      </div>
+
+      {/* Escrow & Security Deposit Protection HUD */}
+      <div className="rounded-xl border border-primary/20 bg-primary/5 p-5">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary text-white shadow-sm">
+              <ShieldCheck className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-display text-base font-semibold text-ink">Deposit Escrow & Resolution Engine</h3>
+                <span className="rounded-full bg-emerald-600/10 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                  Active Protection
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground leading-relaxed max-w-2xl">
+                Security deposits on active bookings are securely held in platform escrow. Upon item return, an automated 24-hour inspection window opens before deposits release back to renters.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-xs text-muted-foreground">Need to inspect an item?</span>
+            <Link
+              href="/dashboard/lister?tab=requests"
+              onClick={() => setActiveTab("requests")}
+              className="btn-outline text-xs px-3.5 py-1.5 inline-flex items-center gap-1.5"
+            >
+              <AlertTriangle className="h-3.5 w-3.5 text-rust" /> Review Bookings
+            </Link>
+          </div>
+        </div>
       </div>
 
       <div className="flex gap-3 overflow-x-auto pb-2">

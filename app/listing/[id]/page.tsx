@@ -13,6 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useParams, useRouter } from "next/navigation";
 import { trackEvent } from "@/lib/analytics";
 import { Card3D } from "@/components/ui/card-3d";
+import { SmartFitRecommender } from "@/components/smart-fit-recommender";
 
 export default function ListingDetail() {
   const params = useParams();
@@ -188,6 +189,11 @@ export default function ListingDetail() {
           <p className="mt-1 text-xs text-primary font-medium">
             That's {Math.round((price / retailPrice) * 100 * 10) / 10 || 0}% of retail per day
           </p>
+
+          <SmartFitRecommender
+            garmentSize={size}
+            garmentCategory={category}
+          />
 
           {/* Availability picker */}
           <div className="mt-7 border border-border">

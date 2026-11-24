@@ -16,8 +16,8 @@ export function ScrollReveal({
   className = "",
   delayMs = 0,
   direction = "up",
-  distance = 24,
-  duration = 0.65,
+  distance = 32,
+  duration = 0.7,
 }: ScrollRevealProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
@@ -28,6 +28,7 @@ export function ScrollReveal({
     const el = ref.current;
     if (!el) return;
 
+    // Check if IntersectionObserver is available and motion is not reduced
     if (
       typeof window === "undefined" ||
       !("IntersectionObserver" in window) ||
@@ -37,15 +38,17 @@ export function ScrollReveal({
       return;
     }
 
-    // Check if element is already in or near viewport on mount
     const rect = el.getBoundingClientRect();
-    if (rect.top > window.innerHeight + 50) {
-      // Only hide if genuinely below the viewport fold
-      setIsVisible(false);
-    } else {
+    const isInViewport = rect.top < window.innerHeight && rect.bottom > 0;
+
+    if (isInViewport) {
+      // Element is already visible on initial mount (e.g. top hero)
       setIsVisible(true);
       return;
     }
+
+    // Element is below the fold - hide it until the user scrolls into view
+    setIsVisible(false);
 
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -55,23 +58,17 @@ export function ScrollReveal({
         }
       },
       {
-        threshold: 0.01,
-        rootMargin: "0px 0px 80px 0px",
+        threshold: 0.1,
+        rootMargin: "0px 0px -30px 0px",
       }
     );
 
     observer.observe(el);
 
-    // Safety fallback: ensure nothing stays permanently hidden
-    const timer = setTimeout(() => {
-      setIsVisible(true);
-    }, Math.max(delayMs + 400, 600));
-
     return () => {
       observer.disconnect();
-      clearTimeout(timer);
     };
-  }, [delayMs]);
+  }, []);
 
   const getTransform = () => {
     if (!mounted || isVisible) return "none";
@@ -85,7 +82,7 @@ export function ScrollReveal({
       case "right":
         return `translate3d(-${distance}px, 0, 0)`;
       case "zoom":
-        return `translate3d(0, ${distance / 2}px, 0) scale(0.96)`;
+        return `translate3d(0, ${distance / 2}px, 0) scale(0.95)`;
       case "fade":
       default:
         return "none";

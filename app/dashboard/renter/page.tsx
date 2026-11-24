@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { Check, Clock, Heart, History, Package, RotateCcw, Ruler, ShoppingBag } from "lucide-react";
+import { Check, Clock, Heart, History, Package, RotateCcw, Ruler, ShoppingBag, ShieldCheck, Wallet } from "lucide-react";
 
 const statusSteps = [
   { id: "requested", label: "Requested", icon: Clock },
@@ -76,6 +76,30 @@ export default function RenterDashboard() {
 
   return (
     <div className="space-y-8">
+      {/* Renter Deposit Escrow & Refund Protection HUD */}
+      <div className="rounded-xl border border-primary/20 bg-primary/5 p-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary text-white shadow-sm">
+              <ShieldCheck className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-display text-sm font-semibold text-ink">WearShare Deposit Protection Guarantee</h3>
+                <span className="rounded-full bg-emerald-600/10 px-2 py-0.5 text-[10px] font-bold text-emerald-700">100% Escrow Backed</span>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Your refundable security deposits are held in insured platform escrow and auto-refunded to your original UPI account within 24 hours of outfit return.
+              </p>
+            </div>
+          </div>
+          <div className="text-right shrink-0">
+            <span className="text-[10px] uppercase font-bold text-muted-foreground block">Active Escrow</span>
+            <span className="font-display text-lg font-bold text-primary">₹0 Pending</span>
+          </div>
+        </div>
+      </div>
+
       <div className="flex gap-3 overflow-x-auto pb-2">
         <TabButton active={activeTab === "orders"} onClick={() => setActiveTab("orders")} icon={History}>
           Orders & returns
