@@ -263,36 +263,61 @@ export default async function Index() {
       </section>
 
       <section className="border-y border-border bg-secondary/40">
-        <div className="container-edit grid gap-12 py-20 md:grid-cols-12 md:py-28">
+        <div className="container-edit grid gap-12 py-20 md:grid-cols-12 md:py-28 items-start">
           <div className="md:col-span-4">
-            <ScrollReveal direction="right" duration={0.7}>
+            <ScrollReveal direction="right" distance={40} duration={0.75}>
               <p className="eyebrow">How WearShare works</p>
               <h2 className="mt-3 font-display text-4xl leading-tight text-ink md:text-5xl">
                 Three steps. <span className="italic text-primary">Zero stress.</span>
               </h2>
-              <p className="mt-5 text-muted-foreground">
+              <p className="mt-5 text-muted-foreground leading-relaxed">
                 Designed for first-time renters and listers. Every step protected by deposit cover and our
                 48-hour damage resolution promise.
               </p>
-              <Link href="/how-it-works" className="mt-8 inline-flex items-center gap-1 border-b border-ink pb-1 text-sm text-ink hover:border-primary hover:text-primary">
+              <Link href="/how-it-works" className="mt-8 inline-flex items-center gap-1.5 border-b border-ink pb-1 text-sm font-semibold text-ink hover:border-primary hover:text-primary transition-colors">
                 The full process <ArrowUpRight className="h-4 w-4" />
               </Link>
             </ScrollReveal>
           </div>
-          <div className="grid gap-px bg-border sm:grid-cols-3 md:col-span-8">
+          <div className="grid gap-6 sm:grid-cols-3 md:col-span-8">
             {[
               { n: "01", icon: MapPin, t: "Discover near you", d: "Filter by occasion, size, distance and the date you need it. Real photos. Real fits." },
               { n: "02", icon: Calendar, t: "Book the dates", d: "Pay rental + deposit through UPI. Lister confirms within 48 hours. Pickup or delivery." },
               { n: "03", icon: ShieldCheck, t: "Wear, return, review", d: "Return cleaned. Deposit released within 24 hrs. Both sides leave a review." },
             ].map(({ n, icon: Icon, t, d }, idx) => (
-              <ScrollReveal key={n} delayMs={idx * 120} direction="up" duration={0.65} className="h-full">
-                <div className="flex h-full flex-col gap-4 bg-background p-7 md:p-8">
-                  <div className="flex items-center justify-between">
-                    <span className="font-display text-2xl italic text-primary">{n}</span>
-                    <Icon className="h-5 w-5 text-ink" />
+              <ScrollReveal
+                key={n}
+                delayMs={150 + idx * 200}
+                direction="up"
+                distance={48}
+                duration={0.8}
+                className="h-full"
+              >
+                <div className="group flex h-full flex-col justify-between rounded-2xl border border-border bg-background p-7 md:p-8 shadow-sm transition-all duration-300 hover:-translate-y-2 hover:shadow-xl hover:border-primary/40">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="font-display text-3xl italic text-primary transition-transform duration-300 group-hover:scale-110">
+                        {n}
+                      </span>
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-secondary/80 text-ink transition-colors duration-300 group-hover:bg-primary group-hover:text-white shadow-sm">
+                        <Icon className="h-5 w-5" />
+                      </div>
+                    </div>
+                    <h3 className="mt-5 font-display text-xl leading-snug text-ink transition-colors duration-300 group-hover:text-primary">
+                      {t}
+                    </h3>
+                    <p className="mt-2.5 text-sm leading-relaxed text-muted-foreground">
+                      {d}
+                    </p>
                   </div>
-                  <h3 className="font-display text-xl leading-snug text-ink">{t}</h3>
-                  <p className="text-sm leading-relaxed text-muted-foreground">{d}</p>
+                  <div className="mt-6 pt-4 border-t border-border/50 flex items-center justify-between text-xs text-muted-foreground">
+                    <span className="font-semibold text-primary/80 group-hover:text-primary transition-colors">
+                      Step {n}
+                    </span>
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground/70">
+                      Protected
+                    </span>
+                  </div>
                 </div>
               </ScrollReveal>
             ))}
@@ -371,8 +396,15 @@ export default async function Index() {
               { q: "Pickup was 800 metres away. I walked there with my laptop bag.", a: "Rahul S., HSR" },
               { q: "Reviewed every renter. Felt safer than selling secondhand online.", a: "Meera J., Indiranagar" },
             ].map((voice, idx) => (
-              <ScrollReveal key={voice.a} delayMs={idx * 120} direction="up" duration={0.65} className="h-full">
-                <div className="h-full bg-ink p-8">
+              <ScrollReveal
+                key={voice.a}
+                delayMs={120 + idx * 200}
+                direction="up"
+                distance={44}
+                duration={0.8}
+                className="h-full"
+              >
+                <div className="h-full bg-ink p-8 transition-all duration-300 hover:bg-ink/80">
                   <p className="font-display text-xl leading-snug">"{voice.q}"</p>
                   <p className="mt-5 text-xs uppercase tracking-widest text-cream/60">{voice.a}</p>
                 </div>
