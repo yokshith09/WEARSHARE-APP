@@ -133,11 +133,18 @@ export default async function Index() {
           <div className="order-2 md:order-1 md:col-span-7">
             <ScrollReveal direction="up" duration={0.65}>
               <p className="eyebrow">A neighbourhood wardrobe / Est. Bengaluru</p>
-              <h1 className="mt-5 font-display text-[clamp(2.75rem,7vw,6rem)] leading-[0.95] text-ink">
+              <h1 className="mt-5 font-display text-[clamp(2.75rem,7vw,6rem)] leading-[1.05] text-ink">
                 <TextReveal
-                  text="Wear it once. Share it forward."
+                  text="Wear it once."
+                  staggerMs={80}
+                  duration={0.55}
+                />
+                <br />
+                <TextReveal
+                  text="Share it forward."
                   highlight={{ words: ["Share"], className: "italic text-primary" }}
-                  staggerMs={100}
+                  delayOffsetMs={260}
+                  staggerMs={80}
                   duration={0.55}
                 />
               </h1>
